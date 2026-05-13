@@ -40,6 +40,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const oauthSessionRef = useRef<OAuthSession | null>(null);
 
   useEffect(() => {
+    const failSafeMs = 4000;
+    const failSafe = window.setTimeout(() => {
+      setIsLoading(false);
+    }, failSafeMs);
+
     getSession()
       .then((oauthSession) => {
         if (oauthSession) {
@@ -47,7 +52,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setSession({ did: oauthSession.did });
         }
       })
-      .finally(() => setIsLoading(false));
+      .finally(() => {
+        window.clearTimeout(failSafe);
+        setIsLoading(false);
+      });
+
+    return () => {
+      window.clearTimeout(failSafe);
+    };
   }, []);
 
   const handleSignIn = useCallback(async (handle: string) => {

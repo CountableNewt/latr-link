@@ -28,7 +28,8 @@ function isLoopbackHostname(hostname: string): boolean {
 /**
  * Use built-in loopback OAuth (no fetch to latr.link) when:
  * - explicitly enabled via env, or
- * - Next dev + opened on a loopback host (avoids "Failed to fetch" if `.env.local` is missing).
+ * - the page host is loopback (localhost / 127.0.0.1 / ::1) — including `next start`
+ *   and embedded preview browsers, so we do **not** require NODE_ENV=development.
  */
 export function isLocalOAuthMode(): boolean {
   if (
@@ -40,7 +41,6 @@ export function isLocalOAuthMode(): boolean {
 
   if (
     typeof window !== "undefined" &&
-    process.env.NODE_ENV === "development" &&
     isLoopbackHostname(window.location.hostname)
   ) {
     return true;
@@ -95,15 +95,31 @@ function buildDefaultLocalCallbackUrl(): string {
 
 let _clientPromise: Promise<BrowserOAuthClient> | null = null;
 
+const OAUTH_CLIENT_LOAD_TIMEOUT_MS =
+  typeof process !== "undefined" &&
+  process.env.NEXT_PUBLIC_OAUTH_CLIENT_LOAD_TIMEOUT_MS
+    ? Math.max(
+        4000,
+        Number.parseInt(process.env.NEXT_PUBLIC_OAUTH_CLIENT_LOAD_TIMEOUT_MS, 10) ||
+          10_000
+      )
+    : 10_000;
+
 export async function getOAuthClient(): Promise<BrowserOAuthClient> {
   if (typeof window === "undefined") {
     throw new Error("getOAuthClient is browser-only");
   }
   if (!_clientPromise) {
-    _clientPromise = BrowserOAuthClient.load({
+    const load = BrowserOAuthClient.load({
       clientId: resolveClientId(),
       handleResolver: BSKY_APPVIEW_PUBLIC,
-    }).catch((err: unknown) => {
+    });
+    const timeout = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error("OAuth client load timed out"));
+      }, OAUTH_CLIENT_LOAD_TIMEOUT_MS);
+    });
+    _clientPromise = Promise.race([load, timeout]).catch((err: unknown) => {
       _clientPromise = null;
       const cause = err instanceof Error ? err.message : String(err);
       const clientId = resolveClientId();
@@ -135,16 +151,16 @@ export async function handleCallback(): Promise<OAuthSession> {
   return session;
 }
 
-/** Max time for OAuth `init()` + IndexedDB restore before unblocking the UI (embedded / broken dev browsers may hang). */
+/** Default 8s — embedded browsers can stall IndexedDB; pair with AuthProvider failsafe. */
 const SESSION_RESTORE_TIMEOUT_MS =
   typeof process !== "undefined" &&
   process.env.NEXT_PUBLIC_AUTH_RESTORE_TIMEOUT_MS
     ? Math.max(
-        3000,
+        2000,
         Number.parseInt(process.env.NEXT_PUBLIC_AUTH_RESTORE_TIMEOUT_MS, 10) ||
-          12_000
+          8000
       )
-    : 12_000;
+    : 8000;
 
 async function restoreSessionFromStore(): Promise<OAuthSession | null> {
   try {

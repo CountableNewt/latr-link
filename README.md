@@ -36,7 +36,7 @@ cp .env.example .env.local
 bun run dev
 ```
 
-Use [http://127.0.0.1:3000](http://127.0.0.1:3000) for OAuth (loopback). With `next dev`, opening **localhost** or **127.0.0.1** automatically uses loopback OAuth (no fetch to `latr.link`); you can still add `apps/web/.env.local` from `.env.example` for overrides.
+With `next dev` **or** `next start`, opening **`http://127.0.0.1:3000`** or **`http://localhost:3000`** uses **loopback OAuth automatically** (no fetch to `latr.link` for client metadata). You do **not** need `NODE_ENV=development` for that. Optional `apps/web/.env.local` from `.env.example` tweaks timeouts and redirects.
 
 ### Local OAuth (development)
 

@@ -49,8 +49,5 @@ export function useInvalidateSavedLibrary() {
     void queryClient.invalidateQueries({
       queryKey: ["saved-library", session?.did],
     });
-    void queryClient.invalidateQueries({
-      queryKey: ["saved-items", session?.did],
-    });
   };
 }
