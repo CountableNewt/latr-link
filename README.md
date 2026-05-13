@@ -36,7 +36,18 @@ cp .env.example .env.local
 bun run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Use [http://127.0.0.1:3000](http://127.0.0.1:3000) for OAuth (loopback); `NEXT_PUBLIC_APP_ENV=local` is set in `.env.example`.
+
+### Local OAuth (development)
+
+Loopback OAuth must use a `client_id` that includes your `/callback` path and repo scopes. `apps/web/.env.local` should set `NEXT_PUBLIC_APP_ENV=local` (already in `.env.example`).
+
+Prefer **`http://127.0.0.1:3000`** in the browser so the redirect URI matches ATProto loopback rules (see `@atproto/oauth-client-browser` README — the library may rewrite `localhost` to loopback IP).
+
+Optional environment variables (see `apps/web/.env.example`):
+
+- `NEXT_PUBLIC_LOCAL_REDIRECT_URI` — if your dev URL is not the default `http://127.0.0.1:<port>/callback`.
+- `NEXT_PUBLIC_LOCAL_OAUTH_CLIENT_ID` — full custom loopback `client_id` URL (advanced override).
 
 ### Commands (repo root)
 
