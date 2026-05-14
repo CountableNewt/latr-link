@@ -1,27 +1,26 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import Link from "next/link";
 
 import { useAuth } from "@/hooks/useAuth";
 
+const callbackErrorMessage =
+  "Sign-in callback failed. Try an external browser (Chrome/Safari) if preview tools block WebSockets or storage.";
+
+function getInitialCallbackError(): string | null {
+  if (typeof window === "undefined") return null;
+  const params = new URLSearchParams(window.location.search);
+  const error = params.get("error");
+  if (error !== "callback_failed" && error !== "callback_watchdog") return null;
+  return params.get("message") || callbackErrorMessage;
+}
+
 export default function LoginPage() {
   const { signIn } = useAuth();
   const [handle, setHandle] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(getInitialCallbackError);
   const [isPending, setIsPending] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("error") !== "callback_failed") return;
-    const message = params.get("message");
-    setError(
-      message
-        ? decodeURIComponent(message)
-        : "Sign-in callback failed. Try an external browser (Chrome/Safari) if preview tools block WebSockets or storage."
-    );
-  }, []);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();

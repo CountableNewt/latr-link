@@ -40,25 +40,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const oauthSessionRef = useRef<OAuthSession | null>(null);
 
   useEffect(() => {
-    const failSafeMs = 4000;
-    const failSafe = window.setTimeout(() => {
-      setIsLoading(false);
-    }, failSafeMs);
-
+    let cancelled = false;
     getSession()
       .then((oauthSession) => {
+        if (cancelled) return;
         if (oauthSession) {
           oauthSessionRef.current = oauthSession;
           setSession({ did: oauthSession.did });
         }
       })
       .finally(() => {
-        window.clearTimeout(failSafe);
+        if (cancelled) return;
         setIsLoading(false);
       });
 
     return () => {
-      window.clearTimeout(failSafe);
+      cancelled = true;
     };
   }, []);
 

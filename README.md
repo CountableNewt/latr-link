@@ -48,7 +48,7 @@ Optional environment variables (see `apps/web/.env.example`):
 
 - `NEXT_PUBLIC_LOCAL_REDIRECT_URI` — if your dev URL is not the default `http://127.0.0.1:<port>/callback`.
 - `NEXT_PUBLIC_LOCAL_OAUTH_CLIENT_ID` — full custom loopback `client_id` URL (advanced override).
-- `NEXT_PUBLIC_AUTH_RESTORE_TIMEOUT_MS` — cap OAuth/IndexedDB restore wait in ms (default 12000) so the UI cannot stay on “Loading…” forever in embedded or broken browsers.
+- `NEXT_PUBLIC_AUTH_RESTORE_TIMEOUT_MS` — cap OAuth/IndexedDB restore wait in ms (default 8000) so the UI cannot stay on “Loading…” forever in embedded or broken browsers.
 
 ### WebSocket / HMR errors in an embedded browser
 
