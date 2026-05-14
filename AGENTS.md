@@ -1,5 +1,6 @@
 ## Workspace facts
 
+- **Git push — use both remotes.** This repo tracks code on **`origin`** (`git@tangled.org:…`) and mirrors to **`vercel`** (`github.com/CountableNewt/latr-link`) so Vercel’s Git-linked project deploys from GitHub. After a commit: `git push origin <branch> && git push vercel <branch>` (replace `<branch>` with the active branch).
 - Monorepo root: Bun workspaces (`apps/*`, `packages/*`) + Turborepo.
 - Web app: `apps/web` (package name `web`). Run checks with `bun run turbo run build --filter=web...` or `cd apps/web && bun run …`.
 - Shared logic: `packages/latr-kit` (import as `latr-kit` in `apps/web`).
