@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { CSSProperties } from "react";
+import { Analytics } from "@vercel/analytics/react";
 
 import { EnvironmentBanner } from "@/components/shared/EnvironmentBanner";
 import {
@@ -10,9 +11,42 @@ import {
 import "./globals.css";
 import { Providers } from "./providers";
 
+const title = "L@tr.link";
+const description = "Save now. Read later. Yours everywhere.";
+
 export const metadata: Metadata = {
-  title: "L@tr.link",
-  description: "Read later on your ATProto repo",
+  metadataBase: new URL("https://latr.link"),
+  applicationName: title,
+  title: {
+    default: title,
+    template: `%s · ${title}`,
+  },
+  description,
+  alternates: {
+    canonical: "/",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+    },
+  },
+  referrer: "origin-when-cross-origin",
+  openGraph: {
+    title,
+    description,
+    url: "https://latr.link",
+    siteName: title,
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title,
+    description,
+  },
 };
 
 export default function RootLayout({
@@ -40,6 +74,7 @@ export default function RootLayout({
           <EnvironmentBanner />
           {children}
         </Providers>
+        <Analytics />
       </body>
     </html>
   );
