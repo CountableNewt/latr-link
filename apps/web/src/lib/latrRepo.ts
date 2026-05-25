@@ -6,6 +6,7 @@ import { Agent } from "@atproto/api";
 import type { OAuthSession } from "@atproto/oauth-client-browser";
 import { AtUri } from "@atproto/syntax";
 import type { RepoRecord, SavedItemRecord } from "@/lib/latrRecords";
+import { COLLECTION_SAVED_ITEM } from "@/lib/latrRecords";
 
 import { latrGatewayJson } from "@/lib/latrGatewayClient";
 
@@ -22,11 +23,30 @@ export class LatrRepo {
   }
 
   async listSavedItems(): Promise<RepoRecord<SavedItemRecord>[]> {
-    const body = await latrGatewayJson<{ records: RepoRecord<SavedItemRecord>[] }>(
-      this.oauthSession,
-      "/v1/latr/saves"
-    );
-    return body.records;
+    const records: RepoRecord<SavedItemRecord>[] = [];
+    let cursor: string | undefined;
+
+    do {
+      const page = await this.readAgent.api.com.atproto.repo.listRecords({
+        repo: this.did,
+        collection: COLLECTION_SAVED_ITEM,
+        limit: 100,
+        cursor,
+      });
+
+      for (const row of page.data.records ?? []) {
+        if (!row.uri || !row.cid || !row.value) continue;
+        records.push({
+          uri: row.uri,
+          cid: row.cid,
+          value: row.value as SavedItemRecord,
+        });
+      }
+
+      cursor = page.data.cursor;
+    } while (cursor);
+
+    return records;
   }
 
   async saveExternalUrl(url: string): Promise<void> {

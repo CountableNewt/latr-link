@@ -116,11 +116,26 @@ public struct PDSRepositoryClient: RepositoryClient, Sendable {
 
         var responseBody = try await response.body.collect(upTo: 2_097_152)
         guard (200 ... 299).contains(response.status.code) else {
-            throw GatewayError(
-                status: .badGateway,
-                message: "PDS \(method) failed (\(response.status.code))",
-                code: "pds_error"
-            )
+            switch response.status.code {
+            case 401:
+                throw GatewayError(
+                    status: .unauthorized,
+                    message: "PDS rejected OAuth credentials for \(method)",
+                    code: "pds_unauthorized"
+                )
+            case 403:
+                throw GatewayError(
+                    status: .forbidden,
+                    message: "PDS rejected repo scope for \(method)",
+                    code: "pds_forbidden"
+                )
+            default:
+                throw GatewayError(
+                    status: .badGateway,
+                    message: "PDS \(method) failed (\(response.status.code))",
+                    code: "pds_error"
+                )
+            }
         }
 
         guard responseBody.readableBytes > 0 else { return [:] }

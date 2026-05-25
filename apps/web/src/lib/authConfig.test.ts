@@ -68,6 +68,7 @@ describe("local OAuth config", () => {
   });
 
   test("falls back to hosted metadata outside local mode", () => {
+    process.env.NEXT_PUBLIC_APP_ENV = "prod";
     Object.defineProperty(globalThis, "window", {
       configurable: true,
       value: undefined,
@@ -81,7 +82,7 @@ describe("local OAuth config", () => {
     setWindowUrl("https://testing.latr.link/login");
 
     expect(resolveClientId()).toBe(
-      "https://latr-link-dev-gateway.fly.dev/oauth/client-metadata.json"
+      "https://api.testing.latr.link/oauth/client-metadata.json"
     );
   });
 

@@ -30,9 +30,9 @@ describe("hostedOAuthClientIdForOrigin", () => {
     ).toBe("https://preview.example.vercel.app/client-metadata.json");
   });
 
-  test("uses dev gateway metadata for testing.latr.link", () => {
+  test("uses testing API gateway metadata for testing.latr.link", () => {
     expect(hostedOAuthClientIdForOrigin("https://testing.latr.link")).toBe(
-      "https://latr-link-dev-gateway.fly.dev/oauth/client-metadata.json"
+      "https://api.testing.latr.link/oauth/client-metadata.json"
     );
   });
 });
@@ -46,7 +46,7 @@ describe("resolveHostedOAuthClientId", () => {
 
   test("uses gateway metadata for deployment-protected testing host", () => {
     expect(resolveHostedOAuthClientId("https://testing.latr.link")).toBe(
-      "https://latr-link-dev-gateway.fly.dev/oauth/client-metadata.json"
+      "https://api.testing.latr.link/oauth/client-metadata.json"
     );
   });
 

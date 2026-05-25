@@ -1,5 +1,9 @@
 import type { OAuthSession } from "@atproto/oauth-client-browser";
 
+import {
+  createUpstreamDpopProof,
+  pdsXrpcMethodForGatewayRequest,
+} from "@/lib/latrGatewayUpstreamDpop";
 import { latrGatewayBaseUrl } from "@/lib/latrGatewayUrl";
 
 /** Matches gateway `X-ATProto-Upstream-DPoP` for PDS-bound write-through proofs. */
@@ -16,7 +20,9 @@ export async function latrGatewayFetch(
   path: string,
   init?: RequestInit
 ): Promise<Response> {
-  const url = `${latrGatewayBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`;
+  const gatewayPath = path.startsWith("/") ? path : `/${path}`;
+  const url = `${latrGatewayBaseUrl()}${gatewayPath}`;
+  const method = init?.method ?? "GET";
   const clientId = process.env.NEXT_PUBLIC_LATR_GATEWAY_CLIENT_ID?.trim();
   const apiKey = process.env.NEXT_PUBLIC_LATR_GATEWAY_API_KEY?.trim();
   const clientHeaders: Record<string, string> = {};
@@ -25,11 +31,22 @@ export async function latrGatewayFetch(
     clientHeaders[LATR_API_KEY_HEADER] = apiKey;
   }
 
+  const upstream = pdsXrpcMethodForGatewayRequest(method, gatewayPath);
+  const upstreamHeaders: Record<string, string> = {};
+  if (upstream) {
+    upstreamHeaders[LATR_UPSTREAM_DPOP_HEADER] = await createUpstreamDpopProof(
+      oauthSession,
+      upstream.xrpcMethod,
+      upstream.httpMethod
+    );
+  }
+
   return oauthSession.fetchHandler(url, {
     ...init,
     headers: {
       Accept: "application/json",
       ...clientHeaders,
+      ...upstreamHeaders,
       ...(init?.headers ?? {}),
     },
   });

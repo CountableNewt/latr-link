@@ -1,8 +1,5 @@
 import { AT_PROTO_OAUTH_SCOPES } from "@/lib/atprotoOAuthScopes";
-import {
-  inferGatewayApiBase,
-  latrGatewayBaseUrl,
-} from "@/lib/latrGatewayUrl";
+import { inferGatewayApiBase } from "@/lib/latrGatewayUrl";
 
 const PROD_CLIENT_METADATA_URL = "https://latr.link/client-metadata.json";
 

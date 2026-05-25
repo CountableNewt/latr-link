@@ -7,36 +7,44 @@ function mockOAuthSession(
 ): OAuthSession {
   return {
     fetchHandler: handler,
+    getTokenInfo: async () => ({
+      aud: "https://pds.example.test",
+      iss: "https://bsky.social",
+      sub: "did:plc:viewer",
+      scope: "atproto",
+    }),
+    getTokenSet: async () => ({
+      access_token: "test-access-token",
+      token_type: "DPoP",
+    }),
+    server: {
+      dpopKey: {
+        bareJwk: { kty: "EC" },
+        algorithms: ["ES256"],
+        createJwt: async () => "test.upstream.dpop.proof",
+      },
+      serverMetadata: {
+        dpop_signing_alg_values_supported: ["ES256"],
+      },
+    },
   } as unknown as OAuthSession;
 }
 
 describe("LatrRepo gateway facade", () => {
-  test("listSavedItems calls GET /v1/latr/saves", async () => {
+  test("listSavedItems reads saved items from the viewer PDS", async () => {
     const calls: string[] = [];
     const oauth = mockOAuthSession(async (url, init) => {
       calls.push(`${init?.method ?? "GET"} ${url}`);
       return new Response(
-        JSON.stringify({
-          records: [
-            {
-              uri: "at://did/item/com.latr.saved.item/rkey",
-              cid: "bafy",
-              value: {
-                $type: "com.latr.saved.item",
-                subjectUri: "at://did/ext/com.latr.saved.external/x",
-                savedAt: "2026-01-01T00:00:00.000Z",
-              },
-            },
-          ],
-        }),
+        JSON.stringify({ records: [] }),
         { status: 200, headers: { "Content-Type": "application/json" } }
       );
     });
 
     const repo = new LatrRepo(oauth, "did:plc:viewer");
     const items = await repo.listSavedItems();
-    expect(items).toHaveLength(1);
-    expect(calls[0]).toContain("/v1/latr/saves");
+    expect(items).toHaveLength(0);
+    expect(calls[0]).toContain("com.atproto.repo.listRecords");
   });
 
   test("saveExternalUrl POSTs url body", async () => {
