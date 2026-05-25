@@ -147,19 +147,23 @@ Sign in at `http://127.0.0.1:3000`, then save/list/archive via the library UI.
 
 ## Fly deployment (dev)
 
-Deploy from the **monorepo root** so the Docker build includes `packages/latr-kit` and `services/latr-gateway`:
+`services/latr-gateway/fly.toml` sets `[build] context = '../..'` so deploys from the gateway directory still upload the monorepo root (including `packages/latr-kit`).
 
 ```bash
 bash services/latr-gateway/deploy.sh dev
 ```
 
-Equivalent:
+Equivalent from `services/latr-gateway/`:
+
+```bash
+fly deploy --config fly.toml --app latr-link-dev-gateway --remote-only
+```
+
+Or from the repo root:
 
 ```bash
 fly deploy . --config services/latr-gateway/fly.toml --app latr-link-dev-gateway --remote-only
 ```
-
-Do not run `fly deploy --config fly.toml` from `services/latr-gateway/` alone — Fly uploads only that directory as build context, so `packages/latr-kit` is missing and the image build fails.
 
 Mount a volume for registered clients and set secrets (example):
 

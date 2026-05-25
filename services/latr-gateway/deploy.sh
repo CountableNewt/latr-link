@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
-# Deploy latr-gateway from monorepo root (Docker context includes packages/latr-kit).
+# Deploy latr-gateway. fly.toml sets build context to monorepo root (../..).
 #
 # Usage: bash deploy.sh dev|main
 set -euo pipefail
 
 SERVICE_DIR="$(cd "$(dirname "$0")" && pwd)"
-ROOT="$(cd "$SERVICE_DIR/../.." && pwd)"
 BRANCH="${1:?usage: deploy.sh dev|main}"
 
 if [ "$BRANCH" = "main" ]; then
@@ -14,13 +13,13 @@ else
   APP="${FLY_GATEWAY_APP_DEV:-latr-link-dev-gateway}"
 fi
 
-cd "$ROOT"
+cd "$SERVICE_DIR"
 
 if command -v flyctl >/dev/null 2>&1; then
-  exec flyctl deploy . --config services/latr-gateway/fly.toml --app "$APP" --remote-only
+  exec flyctl deploy --config fly.toml --app "$APP" --remote-only
 fi
 if command -v fly >/dev/null 2>&1; then
-  exec fly deploy . --config services/latr-gateway/fly.toml --app "$APP" --remote-only
+  exec fly deploy --config fly.toml --app "$APP" --remote-only
 fi
 echo "Install flyctl to deploy: https://fly.io/docs/flyctl/install/" >&2
 exit 1
