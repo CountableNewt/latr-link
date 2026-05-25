@@ -36,7 +36,6 @@ jobs:
             gateway:
               - 'services/latr-gateway/**'
               - 'packages/latr-kit/**'
-              - '.dockerignore'
               - 'scripts/fly-deploy-gateway.sh'
               - '.github/workflows/ci.yml'
 

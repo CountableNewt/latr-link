@@ -1,11 +1,11 @@
 # syntax=docker/dockerfile:1
-# Build context: monorepo root (fly deploy . --config services/latr-gateway/fly.toml).
+# Build context: services/latr-gateway (includes vendor/latr-kit from prepare-docker.sh).
 
 FROM swift:6.1-jammy AS builder
 
 WORKDIR /src
-COPY packages/latr-kit/ ./packages/latr-kit/
-COPY services/latr-gateway/ ./services/latr-gateway/
+COPY vendor/latr-kit/ ./packages/latr-kit/
+COPY . ./services/latr-gateway/
 
 WORKDIR /src/services/latr-gateway
 RUN swift build -c release --static-swift-stdlib

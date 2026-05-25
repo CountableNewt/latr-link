@@ -1,9 +1,9 @@
 ## Workspace facts
 
-- **Git remotes — origin is GitHub, tangled is Tangled.** This repo tracks GitHub on **`origin`** (`github.com/Stygian-Tech/latr-link`) and Tangled on **`tangled`** (`git@tangled.org:did:plc:jq2bt674bkbf6n53zxzmlixv`). After a commit that should appear on both forges: `git push origin <branch> && git push tangled <branch>` (replace `<branch>` with the active branch).
+- **Git — GitHub is primary (`origin`).** Push and CI run on **`origin`** (`github.com/Stygian-Tech/latr-link`). Fly deploy is triggered from **GitHub Actions** (`.github/workflows/ci.yml`). A **`tangled`** remote may exist but is not used for CI/deploy right now — default: `git push origin <branch>`.
 - Monorepo root: Bun workspaces (`apps/*`, `packages/*`, `services/*`) + Turborepo.
 - Web app: `apps/web` (package name `web`). Run checks with `bash scripts/ci.sh` or `bun run turbo run build --filter=web...`.
-- Gateway: `services/latr-gateway` — Swift/Hummingbird HTTP service: registered client API keys + OAuth/DPoP gate, PDS write-through for L@tr saves. Local: `cd services/latr-gateway && swift run LatrGateway` (port 8080). Web uses `NEXT_PUBLIC_LATR_GATEWAY_URL`. Gateway env vars: `services/latr-gateway/.env.example`. Fly deploy: `bash services/latr-gateway/deploy.sh dev` (runs `fly deploy .` from repo root). Raw `fly deploy --config fly.toml` from `services/latr-gateway/` alone uploads an empty context — use `fly deploy ../.. --config fly.toml` or deploy from root.
+- Gateway: `services/latr-gateway` — Swift/Hummingbird HTTP service: registered client API keys + OAuth/DPoP gate, PDS write-through for L@tr saves. Local: `cd services/latr-gateway && swift run LatrGateway` (port 8080). Web uses `NEXT_PUBLIC_LATR_GATEWAY_URL`. Gateway env vars: `services/latr-gateway/.env.example`. Fly deploy from `services/latr-gateway`: `bash deploy.sh dev` (vendors `packages/latr-kit` into `vendor/latr-kit`, then `fly deploy --config fly.toml`).
 - Shared logic: **`packages/latr-kit`** — Swift **`LatrKit`** framework (Apple-style API) for all server-side record workflows.
 
 ## Conventions
@@ -27,4 +27,4 @@
 - **Gateway client auth**: registered apps (`latr-web`, `social-wire`, …) send `X-Latr-Client-Id` / `X-Latr-API-Key` on `/v1/latr/*` (enforced when `APP_ENV=prod`); register via `POST /v1/latr/clients/register`. See `docs/architecture/latr-gateway.md`.
 - **LatrKit packaging**: keep in monorepo while gateway is the sole Swift consumer; extract to a public SPI repo when a second Swift client or gateway-only Docker context is needed — TS/web clients integrate via gateway HTTP, not `import LatrKit`.
 - **latr.link** product shape: ATProto read-later — saved data lives as `com.latr.saved.external` / `com.latr.saved.item` on the signed-in user’s PDS with Open Graph metadata stored on-protocol (`packages/latr-kit`, `packages/lexicons`). Save/list/state run through `services/latr-gateway` (web is a thin OAuth client); see `docs/architecture/latr-gateway.md`.
-- **GitHub Actions CI**: `.github/workflows/ci.yml` runs `bash scripts/ci.sh` on pushes and pull requests to `main` and `dev`; deploys latr-gateway to Fly on push when gateway paths change (`scripts/fly-deploy-gateway.sh`, requires `FLY_API_TOKEN`).
+- **GitHub Actions CI**: `.github/workflows/ci.yml` on **`origin`** — runs `bash scripts/ci.sh` on pushes/PRs to `main` and `dev`; on push, deploys latr-gateway to Fly when gateway paths change (`scripts/fly-deploy-gateway.sh`, GitHub secret **`FLY_API_TOKEN`**).

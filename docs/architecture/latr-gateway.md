@@ -147,25 +147,20 @@ Sign in at `http://127.0.0.1:3000`, then save/list/archive via the library UI.
 
 ## Fly deployment (dev)
 
-`services/latr-gateway/fly.toml` expects the **monorepo root** as Docker build context (includes `packages/latr-kit`).
+Fly builds from **`services/latr-gateway/`** (the app directory). `deploy.sh` stages `packages/latr-kit` into `vendor/latr-kit` before the image build.
 
 ```bash
 bash services/latr-gateway/deploy.sh dev
 ```
 
-Equivalent from repo root:
+Manual steps from `services/latr-gateway/`:
 
 ```bash
-fly deploy . --config services/latr-gateway/fly.toml --app latr-link-dev-gateway --remote-only
+bash prepare-docker.sh
+fly deploy --config fly.toml --app latr-link-dev-gateway --remote-only
 ```
 
-If your deploy runner’s working directory is `services/latr-gateway/` (e.g. Tangled/Fly `flyctl deploy --config fly.toml`), pass the context explicitly:
-
-```bash
-fly deploy ../.. --config fly.toml --app latr-link-dev-gateway --remote-only
-```
-
-Do **not** run `fly deploy --config fly.toml` without a context path — Fly uploads only the gateway folder (~2B) and the image build fails.
+CI deploys via **GitHub Actions** (`scripts/fly-deploy-gateway.sh` → `deploy.sh`, which runs `prepare-docker.sh` before `fly deploy --config fly.toml`).
 
 Mount a volume for registered clients and set secrets (example):
 
