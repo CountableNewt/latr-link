@@ -1,17 +1,18 @@
-# Deploy (from services/latr-gateway — context below points at monorepo root):
-#   bash deploy.sh dev
+# Deploy from monorepo root (required — Dockerfile COPY paths need packages/latr-kit):
+#   bash services/latr-gateway/deploy.sh dev
 # Or:
-#   fly deploy --config fly.toml --app latr-link-dev-gateway --remote-only
+#   fly deploy . --config services/latr-gateway/fly.toml --app latr-link-dev-gateway --remote-only
 #
-# From repo root:
-#   fly deploy . --config services/latr-gateway/fly.toml --app latr-link-dev-gateway
+# From services/latr-gateway/ only (Tangled/Fly raw flyctl):
+#   fly deploy ../.. --config fly.toml --app latr-link-dev-gateway --remote-only
+#
+# Do NOT run `fly deploy --config fly.toml` without a context path — uploads an empty directory.
 
 app = 'latr-link-dev-gateway'
 primary_region = 'ams'
 
 [build]
   dockerfile = 'Dockerfile'
-  context = '../..'
 
 [deploy]
   wait_timeout = '10m0s'
