@@ -1,25 +1,10 @@
 import { AT_PROTO_OAUTH_SCOPES } from "@/lib/atprotoOAuthScopes";
+import {
+  inferGatewayApiBase,
+  latrGatewayBaseUrl,
+} from "@/lib/latrGatewayUrl";
 
 const PROD_CLIENT_METADATA_URL = "https://latr.link/client-metadata.json";
-const DEFAULT_DEV_GATEWAY_URL = "https://latr-link-dev-gateway.fly.dev";
-
-/** Public gateway URL for hosted dev OAuth when the web SPA is deployment-protected. */
-export function inferGatewayApiBase(origin?: string): string | null {
-  if (origin) {
-    try {
-      const { hostname } = new URL(origin);
-      if (hostname === "testing.latr.link") {
-        return (
-          process.env.NEXT_PUBLIC_LATR_GATEWAY_URL?.trim().replace(/\/$/, "") ??
-          DEFAULT_DEV_GATEWAY_URL
-        );
-      }
-    } catch {
-      //
-    }
-  }
-  return null;
-}
 
 export function gatewayWebOAuthClientMetadataUrl(apiBase: string): string {
   return `${apiBase.replace(/\/$/, "")}/oauth/client-metadata.json`;

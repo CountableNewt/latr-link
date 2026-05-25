@@ -1,5 +1,7 @@
 import type { OAuthSession } from "@atproto/oauth-client-browser";
 
+import { latrGatewayBaseUrl } from "@/lib/latrGatewayUrl";
+
 /** Matches gateway `X-ATProto-Upstream-DPoP` for PDS-bound write-through proofs. */
 export const LATR_UPSTREAM_DPOP_HEADER = "X-ATProto-Upstream-DPoP";
 
@@ -7,11 +9,7 @@ export const LATR_UPSTREAM_DPOP_HEADER = "X-ATProto-Upstream-DPoP";
 export const LATR_CLIENT_ID_HEADER = "X-Latr-Client-Id";
 export const LATR_API_KEY_HEADER = "X-Latr-API-Key";
 
-export function latrGatewayBaseUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_LATR_GATEWAY_URL ?? "http://127.0.0.1:8080"
-  ).replace(/\/$/, "");
-}
+export { latrGatewayBaseUrl } from "@/lib/latrGatewayUrl";
 
 export async function latrGatewayFetch(
   oauthSession: OAuthSession,

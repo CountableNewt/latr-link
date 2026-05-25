@@ -89,8 +89,9 @@ describe("LatrRepo gateway facade", () => {
 });
 
 describe("latrGatewayBaseUrl", () => {
-  test("defaults to local gateway", async () => {
+  test("re-exports env-aware gateway URL resolution", async () => {
     const prev = process.env.NEXT_PUBLIC_LATR_GATEWAY_URL;
+    process.env.NEXT_PUBLIC_APP_ENV = "local";
     delete process.env.NEXT_PUBLIC_LATR_GATEWAY_URL;
     const { latrGatewayBaseUrl } = await import("./latrGatewayClient");
     expect(latrGatewayBaseUrl()).toBe("http://127.0.0.1:8080");
