@@ -1,7 +1,7 @@
-# Deploy from services/latr-gateway (app directory):
-#   bash deploy.sh dev
-# Or:
-#   bash prepare-docker.sh && fly deploy --config fly.toml --app latr-link-dev-gateway --remote-only
+# fly.toml app configuration file generated for latr-link-dev-gateway on 2026-05-25T15:26:09Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
 app = 'latr-link-dev-gateway'
 primary_region = 'ams'
@@ -13,12 +13,8 @@ primary_region = 'ams'
   wait_timeout = '10m0s'
 
 [env]
-  PORT = '8080'
   APP_ENV = 'dev'
-  # OAUTH_GATEWAY_REQUIRE_KNOWN_CLIENT = 'true'
-  # OAUTH_GATEWAY_ALLOWED_CLIENT_IDS = 'https://latr.link/client-metadata.json,https://thesocialwire.app/client-metadata.json'
-  # LATR_GATEWAY_REQUIRE_CLIENT_API_KEY = 'true'
-  # LATR_GATEWAY_CLIENT_API_KEYS = 'latr-web=REPLACE_ME,social-wire=REPLACE_ME'
+  PORT = '8080'
 
 [http_service]
   internal_port = 8080
@@ -38,3 +34,4 @@ primary_region = 'ams'
   memory = '256mb'
   cpu_kind = 'shared'
   cpus = 1
+  memory_mb = 256
