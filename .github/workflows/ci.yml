@@ -5,6 +5,13 @@ on:
     branches: [main, dev]
   pull_request:
     branches: [main, dev]
+  workflow_dispatch:
+    inputs:
+      deploy_gateway:
+        description: Deploy latr-gateway to Fly after CI checks
+        required: true
+        type: boolean
+        default: false
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -14,6 +21,25 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    outputs:
+      gateway: ${{ steps.filter.outputs.gateway }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            gateway:
+              - 'services/latr-gateway/**'
+              - 'packages/latr-kit/**'
+              - '.dockerignore'
+              - 'scripts/fly-deploy-gateway.sh'
+              - '.github/workflows/ci.yml'
+
   ci:
     name: Test and build
     runs-on: macos-latest
@@ -28,3 +54,29 @@ jobs:
         run: bash scripts/ci.sh
         env:
           NEXT_PUBLIC_APP_ENV: test
+
+  deploy-gateway:
+    name: Deploy Gateway (Fly.io)
+    needs: [changes, ci]
+    if: |
+      always() &&
+      needs.ci.result == 'success' &&
+      needs.changes.result == 'success' &&
+      needs.changes.outputs.gateway == 'true' &&
+      (
+        (github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'dev')) ||
+        (github.event_name == 'workflow_dispatch' && inputs.deploy_gateway)
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@v1
+
+      - name: Deploy gateway to Fly.io
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          FLY_ORG: ${{ secrets.FLY_ORG }}
+          FLY_GATEWAY_APP_DEV: ${{ secrets.FLY_GATEWAY_APP_DEV }}
+          FLY_GATEWAY_APP_PROD: ${{ secrets.FLY_GATEWAY_APP_PROD }}
+        run: bash scripts/fly-deploy-gateway.sh "${{ github.ref_name }}"

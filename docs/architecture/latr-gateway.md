@@ -183,8 +183,9 @@ Set `NEXT_PUBLIC_LATR_GATEWAY_URL` (and client key env vars when required) on Ve
 
 ## CI
 
-- **GitHub Actions:** `.github/workflows/ci.yml` — install, Swift LatrKit/gateway test/build, web typecheck/lint/test/build on `main` / `dev`.
+- **GitHub Actions:** `.github/workflows/ci.yml` — `bash scripts/ci.sh` on pushes and pull requests to `main` and `dev`; on push (or manual workflow dispatch with **Deploy latr-gateway**), deploys `services/latr-gateway` to Fly when gateway-related paths change.
 - Local equivalent: `bash scripts/ci.sh`
+- Fly deploy from CI requires GitHub secret **`FLY_API_TOKEN`**; optional **`FLY_GATEWAY_APP_DEV`**, **`FLY_GATEWAY_APP_PROD`**, **`FLY_ORG`**.
 
 ## Social Wire integration
 
