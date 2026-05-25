@@ -159,7 +159,7 @@ Equivalent:
 fly deploy . --config services/latr-gateway/fly.toml --app latr-link-dev-gateway --remote-only
 ```
 
-Do not run `fly deploy` from `services/latr-gateway/` alone — the build context must be the repo root.
+Do not run `fly deploy --config fly.toml` from `services/latr-gateway/` alone — Fly uploads only that directory as build context, so `packages/latr-kit` is missing and the image build fails.
 
 Mount a volume for registered clients and set secrets (example):
 

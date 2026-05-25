@@ -1,4 +1,5 @@
 # syntax=docker/dockerfile:1
+# Build context: monorepo root (fly deploy . --config services/latr-gateway/fly.toml).
 
 FROM swift:6.1-jammy AS builder
 

@@ -3,7 +3,7 @@
 - **Git remotes — origin is GitHub, tangled is Tangled.** This repo tracks GitHub on **`origin`** (`github.com/Stygian-Tech/latr-link`) and Tangled on **`tangled`** (`git@tangled.org:did:plc:jq2bt674bkbf6n53zxzmlixv`). After a commit that should appear on both forges: `git push origin <branch> && git push tangled <branch>` (replace `<branch>` with the active branch).
 - Monorepo root: Bun workspaces (`apps/*`, `packages/*`, `services/*`) + Turborepo.
 - Web app: `apps/web` (package name `web`). Run checks with `bash scripts/ci.sh` or `bun run turbo run build --filter=web...`.
-- Gateway: `services/latr-gateway` — Swift/Hummingbird HTTP service: OAuth/DPoP gate, PDS write-through for L@tr saves. Local: `cd services/latr-gateway && swift run LatrGateway` (port 8080). Web uses `NEXT_PUBLIC_LATR_GATEWAY_URL`.
+- Gateway: `services/latr-gateway` — Swift/Hummingbird HTTP service: registered client API keys + OAuth/DPoP gate, PDS write-through for L@tr saves. Local: `cd services/latr-gateway && swift run LatrGateway` (port 8080). Web uses `NEXT_PUBLIC_LATR_GATEWAY_URL`. Gateway env vars: `services/latr-gateway/.env.example`. Fly/Docker deploy from **monorepo root** (`bash services/latr-gateway/deploy.sh dev` or `fly deploy . --config services/latr-gateway/fly.toml`); build context must include `packages/latr-kit` — do not deploy from `services/latr-gateway/` alone.
 - Shared logic: **`packages/latr-kit`** — Swift **`LatrKit`** framework (Apple-style API) for all server-side record workflows.
 
 ## Conventions
@@ -23,6 +23,8 @@
 
 ## Learned Workspace Facts
 
-- **the-social-wire**: sibling Turborepo under the same parent as this repo (`../the-social-wire`) — reference for monorepo layout, gateway patterns, and eventual shared `LatrKit` integration for a unified L@tr experience across platforms.
+- **the-social-wire**: sibling Turborepo (`../the-social-wire`) — integrates with L@tr via **latr-gateway HTTP** (register `social-wire` client API key + viewer OAuth/DPoP), not a Swift `LatrKit` import in the web app.
+- **Gateway client auth**: registered apps (`latr-web`, `social-wire`, …) send `X-Latr-Client-Id` / `X-Latr-API-Key` on `/v1/latr/*` (enforced when `APP_ENV=prod`); register via `POST /v1/latr/clients/register`. See `docs/architecture/latr-gateway.md`.
+- **LatrKit packaging**: keep in monorepo while gateway is the sole Swift consumer; extract to a public SPI repo when a second Swift client or gateway-only Docker context is needed — TS/web clients integrate via gateway HTTP, not `import LatrKit`.
 - **latr.link** product shape: ATProto read-later — saved data lives as `com.latr.saved.external` / `com.latr.saved.item` on the signed-in user’s PDS with Open Graph metadata stored on-protocol (`packages/latr-kit`, `packages/lexicons`). Save/list/state run through `services/latr-gateway` (web is a thin OAuth client); see `docs/architecture/latr-gateway.md`.
 - **GitHub Actions CI**: `.github/workflows/ci.yml` runs `bash scripts/ci.sh` on pushes and pull requests to `main` and `dev`.

@@ -1,6 +1,7 @@
-# Deploy from monorepo root (required — Dockerfile copies packages/latr-kit + services/latr-gateway):
+# Deploy from monorepo root (Docker context must include packages/latr-kit):
 #   bash services/latr-gateway/deploy.sh dev
-# Or:
+#
+# Equivalent:
 #   fly deploy . --config services/latr-gateway/fly.toml --app latr-link-dev-gateway
 
 app = 'latr-link-dev-gateway'
@@ -8,8 +9,6 @@ primary_region = 'ams'
 
 [build]
   dockerfile = 'services/latr-gateway/Dockerfile'
-  # Build context is the deploy path (repo root). Do not set context = '../..' — remote
-  # builders reject parent paths and upload an empty context.
 
 [deploy]
   wait_timeout = '10m0s'

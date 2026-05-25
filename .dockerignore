@@ -1,4 +1,4 @@
-# Keep Fly/Depot gateway image builds fast; context is the monorepo root.
+# Fly/Depot gateway image — build context is the monorepo root.
 .git
 .github
 **/.build
@@ -16,3 +16,4 @@ docs
 packages/lexicons
 scripts
 .tangled
+services/latr-gateway/vendor
