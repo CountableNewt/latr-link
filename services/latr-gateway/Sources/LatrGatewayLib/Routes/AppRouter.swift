@@ -109,6 +109,8 @@ public func buildRouter(services: GatewayServices) -> Router<BasicRequestContext
         try jsonResponse(HealthResponse(status: "ok", service: "latr-gateway"))
     }
 
+    OAuthMetadataRoutes.register(on: router, oauthRedirectOrigin: services.config.oauthPublicOrigin)
+
     let latr = router.group("v1/latr")
 
     latr.post("clients/register") { request, _ in

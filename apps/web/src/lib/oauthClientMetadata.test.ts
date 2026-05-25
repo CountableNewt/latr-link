@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { AT_PROTO_OAUTH_SCOPES } from "@/lib/atprotoOAuthScopes";
 import {
   buildWebOAuthClientMetadata,
+  gatewayWebOAuthClientMetadataUrl,
   hostedOAuthClientIdForOrigin,
   resolveHostedOAuthClientId,
 } from "@/lib/oauthClientMetadata";
@@ -23,15 +24,15 @@ describe("buildWebOAuthClientMetadata", () => {
 });
 
 describe("hostedOAuthClientIdForOrigin", () => {
-  test("uses same-origin metadata for preview hosts", () => {
+  test("uses same-origin metadata for unmapped preview hosts", () => {
     expect(
       hostedOAuthClientIdForOrigin("https://preview.example.vercel.app")
     ).toBe("https://preview.example.vercel.app/client-metadata.json");
   });
 
-  test("uses same-origin metadata for testing.latr.link", () => {
+  test("uses dev gateway metadata for testing.latr.link", () => {
     expect(hostedOAuthClientIdForOrigin("https://testing.latr.link")).toBe(
-      "https://testing.latr.link/client-metadata.json"
+      "https://latr-link-dev-gateway.fly.dev/oauth/client-metadata.json"
     );
   });
 });
@@ -41,6 +42,12 @@ describe("resolveHostedOAuthClientId", () => {
     expect(
       resolveHostedOAuthClientId("https://testing-latr-link.vercel.app")
     ).toBe("https://testing-latr-link.vercel.app/client-metadata.json");
+  });
+
+  test("uses gateway metadata for deployment-protected testing host", () => {
+    expect(resolveHostedOAuthClientId("https://testing.latr.link")).toBe(
+      "https://latr-link-dev-gateway.fly.dev/oauth/client-metadata.json"
+    );
   });
 
   test("honors NEXT_PUBLIC_ATPROTO_CLIENT_ID on unmapped preview hosts", () => {
@@ -75,5 +82,15 @@ describe("resolveHostedOAuthClientId", () => {
         process.env.NEXT_PUBLIC_ATPROTO_CLIENT_ID = prevClientId;
       }
     }
+  });
+});
+
+describe("gatewayWebOAuthClientMetadataUrl", () => {
+  test("builds the gateway discoverable client_id URL", () => {
+    expect(
+      gatewayWebOAuthClientMetadataUrl("https://latr-link-dev-gateway.fly.dev")
+    ).toBe(
+      "https://latr-link-dev-gateway.fly.dev/oauth/client-metadata.json"
+    );
   });
 });

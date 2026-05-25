@@ -1,19 +1,55 @@
 import { AT_PROTO_OAUTH_SCOPES } from "@/lib/atprotoOAuthScopes";
 
 const PROD_CLIENT_METADATA_URL = "https://latr.link/client-metadata.json";
+const DEFAULT_DEV_GATEWAY_URL = "https://latr-link-dev-gateway.fly.dev";
 
-/** Hosted OAuth `client_id` for a web origin (same-origin discoverable metadata). */
+/** Public gateway URL for hosted dev OAuth when the web SPA is deployment-protected. */
+export function inferGatewayApiBase(origin?: string): string | null {
+  if (origin) {
+    try {
+      const { hostname } = new URL(origin);
+      if (hostname === "testing.latr.link") {
+        return (
+          process.env.NEXT_PUBLIC_LATR_GATEWAY_URL?.trim().replace(/\/$/, "") ??
+          DEFAULT_DEV_GATEWAY_URL
+        );
+      }
+    } catch {
+      //
+    }
+  }
+  return null;
+}
+
+export function gatewayWebOAuthClientMetadataUrl(apiBase: string): string {
+  return `${apiBase.replace(/\/$/, "")}/oauth/client-metadata.json`;
+}
+
+/** Hosted OAuth `client_id` for a web origin. */
 export function hostedOAuthClientIdForOrigin(origin: string): string {
+  const gateway = inferGatewayApiBase(origin);
+  if (gateway) {
+    return gatewayWebOAuthClientMetadataUrl(gateway);
+  }
   return `${origin.replace(/\/$/, "")}/client-metadata.json`;
+}
+
+/** True when the origin must use public gateway metadata (not same-origin SPA JSON). */
+export function originUsesGatewayOAuthClientMetadata(origin: string): boolean {
+  const base = origin.replace(/\/$/, "");
+  return hostedOAuthClientIdForOrigin(origin) !== `${base}/client-metadata.json`;
 }
 
 /**
  * Resolve hosted OAuth client_id in the browser.
- * Preview/dev hosts use same-origin `/client-metadata.json` unless
- * `NEXT_PUBLIC_ATPROTO_CLIENT_ID` overrides (and is not the prod default).
+ * Gateway client_id wins over `NEXT_PUBLIC_ATPROTO_CLIENT_ID` when the SPA host is
+ * deployment-protected (e.g. testing.latr.link behind Vercel auth).
  */
 export function resolveHostedOAuthClientId(origin: string): string {
   const fromOrigin = hostedOAuthClientIdForOrigin(origin);
+  if (originUsesGatewayOAuthClientMetadata(origin)) {
+    return fromOrigin;
+  }
   const explicit = process.env.NEXT_PUBLIC_ATPROTO_CLIENT_ID?.trim();
   if (explicit && explicit !== PROD_CLIENT_METADATA_URL) {
     return explicit;

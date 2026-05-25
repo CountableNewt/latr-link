@@ -76,12 +76,12 @@ describe("local OAuth config", () => {
     expect(resolveClientId()).toBe("https://latr.link/client-metadata.json");
   });
 
-  test("uses same-origin hosted metadata on preview hosts", () => {
+  test("uses gateway hosted metadata on testing.latr.link", () => {
     process.env.NEXT_PUBLIC_APP_ENV = "dev";
-    setWindowUrl("https://testing-latr-link.vercel.app/login");
+    setWindowUrl("https://testing.latr.link/login");
 
     expect(resolveClientId()).toBe(
-      "https://testing-latr-link.vercel.app/client-metadata.json"
+      "https://latr-link-dev-gateway.fly.dev/oauth/client-metadata.json"
     );
   });
 

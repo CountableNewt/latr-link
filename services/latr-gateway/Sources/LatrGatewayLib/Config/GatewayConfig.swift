@@ -17,6 +17,8 @@ public struct GatewayConfig: Sendable {
     public let clientAPIKeys: [String: String]
     public let clientRegistryURL: URL
     public let clientRegistrationSecret: String?
+    /// SPA origin for OAuth redirect_uris when metadata is served from the gateway.
+    public let oauthPublicOrigin: String?
 
     public init(
         port: Int,
@@ -27,7 +29,8 @@ public struct GatewayConfig: Sendable {
         requireClientAPIKey: Bool = false,
         clientAPIKeys: [String: String] = [:],
         clientRegistryURL: URL = GatewayConfig.defaultClientRegistryURL(),
-        clientRegistrationSecret: String? = nil
+        clientRegistrationSecret: String? = nil,
+        oauthPublicOrigin: String? = nil
     ) {
         self.port = port
         self.appEnv = appEnv
@@ -38,6 +41,7 @@ public struct GatewayConfig: Sendable {
         self.clientAPIKeys = clientAPIKeys
         self.clientRegistryURL = clientRegistryURL
         self.clientRegistrationSecret = clientRegistrationSecret
+        self.oauthPublicOrigin = oauthPublicOrigin
     }
 
     public static func defaultClientRegistryURL() -> URL {
@@ -84,6 +88,8 @@ public struct GatewayConfig: Sendable {
         let clientRegistryURL = resolvedClientRegistryURL(from: env)
         let registrationSecret = env["LATR_GATEWAY_CLIENT_REGISTRATION_SECRET"]?
             .trimmingCharacters(in: .whitespacesAndNewlines)
+        let oauthPublicOrigin = env["OAUTH_PUBLIC_ORIGIN"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
 
         return GatewayConfig(
             port: port,
@@ -94,7 +100,8 @@ public struct GatewayConfig: Sendable {
             requireClientAPIKey: requireClientAPIKey,
             clientAPIKeys: clientAPIKeys,
             clientRegistryURL: clientRegistryURL,
-            clientRegistrationSecret: registrationSecret?.isEmpty == false ? registrationSecret : nil
+            clientRegistrationSecret: registrationSecret?.isEmpty == false ? registrationSecret : nil,
+            oauthPublicOrigin: oauthPublicOrigin?.isEmpty == false ? oauthPublicOrigin : nil
         )
     }
 }

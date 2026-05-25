@@ -6,6 +6,7 @@ set -euo pipefail
 
 SERVICE_DIR="$(cd "$(dirname "$0")" && pwd)"
 BRANCH="${1:?usage: deploy.sh dev|main}"
+shift
 
 if [ "$BRANCH" = "main" ]; then
   APP="${FLY_GATEWAY_APP_PROD:-latr-link-prod-gateway}"
