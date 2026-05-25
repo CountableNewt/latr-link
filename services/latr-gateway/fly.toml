@@ -15,7 +15,9 @@ primary_region = 'ams'
   PORT = '8080'
   APP_ENV = 'dev'
   # OAUTH_GATEWAY_REQUIRE_KNOWN_CLIENT = 'true'
-  # OAUTH_GATEWAY_ALLOWED_CLIENT_IDS = 'https://latr.link/client-metadata.json'
+  # OAUTH_GATEWAY_ALLOWED_CLIENT_IDS = 'https://latr.link/client-metadata.json,https://thesocialwire.app/client-metadata.json'
+  # LATR_GATEWAY_REQUIRE_CLIENT_API_KEY = 'true'
+  # LATR_GATEWAY_CLIENT_API_KEYS = 'latr-web=REPLACE_ME,social-wire=REPLACE_ME'
 
 [http_service]
   internal_port = 8080

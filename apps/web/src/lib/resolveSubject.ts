@@ -1,13 +1,22 @@
 import { AtUri } from "@atproto/syntax";
 import {
   COLLECTION_SAVED_EXTERNAL,
-  previewTitleForExternal,
   type SavedExternalRecord,
   type SavedItemRecord,
-} from "latr-kit";
+} from "@/lib/latrRecords";
 
 import { publicAppviewAgent } from "@/lib/appview";
 import type { LatrRepo } from "@/lib/latrRepo";
+
+function previewTitleForExternal(rec: SavedExternalRecord): string {
+  return (
+    rec.title?.trim() ||
+    rec.site?.trim() ||
+    rec.normalizedUrl ||
+    rec.url ||
+    "Saved link"
+  );
+}
 
 export interface ResolvedPreview {
   title: string;

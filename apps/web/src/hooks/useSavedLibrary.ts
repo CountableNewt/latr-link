@@ -10,7 +10,7 @@ import {
   type ResolvedPreview,
 } from "@/lib/resolveSubject";
 import type { LatrRepo, RepoRecord } from "@/lib/latrRepo";
-import type { SavedItemRecord } from "latr-kit";
+import type { SavedItemRecord } from "@/lib/latrRecords";
 
 export type SavedRow = {
   rec: RepoRecord<SavedItemRecord>;

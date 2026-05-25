@@ -1,20 +1,29 @@
 import AsyncHTTPClient
+import Foundation
 import Hummingbird
 import HummingbirdTesting
 import LatrGatewayLib
 import XCTest
 
 final class RouterTests: XCTestCase {
-    private func makeApp() -> (Application<RouterResponder<BasicRequestContext>>, HTTPClient) {
-        let config = GatewayConfig(
+    private func registryURL() -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("latr-router-registry-\(UUID().uuidString).json")
+    }
+
+    private func makeApp(
+        config: GatewayConfig? = nil
+    ) -> (Application<RouterResponder<BasicRequestContext>>, HTTPClient) {
+        let resolvedConfig = config ?? GatewayConfig(
             port: 8080,
             appEnv: .test,
             plcURL: "https://plc.directory",
             oauthRequireKnownClient: false,
-            oauthAllowedClientIDs: []
+            oauthAllowedClientIDs: [],
+            clientRegistryURL: registryURL()
         )
         let httpClient = HTTPClient(eventLoopGroupProvider: .singleton)
-        let services = GatewayServices(config: config, httpClient: httpClient)
+        let services = GatewayServices.make(config: resolvedConfig, httpClient: httpClient)
         let router = buildRouter(services: services)
         let app = Application(router: router)
         return (app, httpClient)
@@ -38,6 +47,57 @@ final class RouterTests: XCTestCase {
         try await app.test(.router) { client in
             try await client.execute(uri: "/v1/latr/saves", method: .get) { response in
                 XCTAssertEqual(response.status, .unauthorized)
+            }
+        }
+        try await httpClient.shutdown()
+    }
+
+    func testAuthGateRejectsMissingClientAPIKeyWhenRequired() async throws {
+        let config = GatewayConfig(
+            port: 8080,
+            appEnv: .test,
+            plcURL: "https://plc.directory",
+            oauthRequireKnownClient: false,
+            oauthAllowedClientIDs: [],
+            requireClientAPIKey: true,
+            clientAPIKeys: ["latr-web": "secret"],
+            clientRegistryURL: registryURL()
+        )
+        let httpClient = HTTPClient(eventLoopGroupProvider: .singleton)
+        let services = GatewayServices.make(config: config, httpClient: httpClient)
+        let router = buildRouter(services: services)
+        let app = Application(router: router)
+
+        try await app.test(.router) { client in
+            try await client.execute(uri: "/v1/latr/saves", method: .get) { response in
+                XCTAssertEqual(response.status, .unauthorized)
+            }
+        }
+        try await httpClient.shutdown()
+    }
+
+    func testRegisterClientReturnsAPIKey() async throws {
+        let config = GatewayConfig(
+            port: 8080,
+            appEnv: .local,
+            plcURL: "https://plc.directory",
+            oauthRequireKnownClient: false,
+            oauthAllowedClientIDs: [],
+            clientRegistryURL: registryURL()
+        )
+        let (app, httpClient) = makeApp(config: config)
+
+        try await app.test(.router) { client in
+            try await client.execute(
+                uri: "/v1/latr/clients/register",
+                method: .post,
+                headers: [.contentType: "application/json"],
+                body: ByteBuffer(string: #"{"clientId":"social-wire","displayName":"The Social Wire"}"#)
+            ) { response in
+                XCTAssertEqual(response.status, .created)
+                let body = String(buffer: response.body)
+                XCTAssertTrue(body.contains("\"clientId\":\"social-wire\""))
+                XCTAssertTrue(body.contains("\"apiKey\":\"latr_"))
             }
         }
         try await httpClient.shutdown()

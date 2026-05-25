@@ -1,8 +1,16 @@
-/** Collection NSIDs for L@tr. */
+/** Lexicon shapes for L@tr records returned by the gateway. */
+
 export const COLLECTION_SAVED_EXTERNAL = "com.latr.saved.external" as const;
 export const COLLECTION_SAVED_ITEM = "com.latr.saved.item" as const;
 
 export type SavedItemState = "unread" | "archived";
+
+/** ATProto repo record returned from gateway list/get responses. */
+export interface RepoRecord<T> {
+  uri: string;
+  cid: string;
+  value: T;
+}
 
 export interface SavedExternalRecord {
   $type: typeof COLLECTION_SAVED_EXTERNAL;

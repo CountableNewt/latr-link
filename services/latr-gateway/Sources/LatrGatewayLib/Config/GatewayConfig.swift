@@ -13,19 +13,40 @@ public struct GatewayConfig: Sendable {
     public let plcURL: String
     public let oauthRequireKnownClient: Bool
     public let oauthAllowedClientIDs: Set<String>
+    public let requireClientAPIKey: Bool
+    public let clientAPIKeys: [String: String]
+    public let clientRegistryURL: URL
+    public let clientRegistrationSecret: String?
 
     public init(
         port: Int,
         appEnv: AppEnvironment,
         plcURL: String,
         oauthRequireKnownClient: Bool,
-        oauthAllowedClientIDs: Set<String>
+        oauthAllowedClientIDs: Set<String>,
+        requireClientAPIKey: Bool = false,
+        clientAPIKeys: [String: String] = [:],
+        clientRegistryURL: URL = GatewayConfig.defaultClientRegistryURL(),
+        clientRegistrationSecret: String? = nil
     ) {
         self.port = port
         self.appEnv = appEnv
         self.plcURL = plcURL
         self.oauthRequireKnownClient = oauthRequireKnownClient
         self.oauthAllowedClientIDs = oauthAllowedClientIDs
+        self.requireClientAPIKey = requireClientAPIKey
+        self.clientAPIKeys = clientAPIKeys
+        self.clientRegistryURL = clientRegistryURL
+        self.clientRegistrationSecret = clientRegistrationSecret
+    }
+
+    public static func defaultClientRegistryURL() -> URL {
+        let raw = ProcessInfo.processInfo.environment["LATR_GATEWAY_CLIENT_REGISTRY_PATH"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if let raw, !raw.isEmpty {
+            return URL(fileURLWithPath: raw)
+        }
+        return URL(fileURLWithPath: "data/client-registry.json", relativeTo: URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
     }
 
     public static func load() -> GatewayConfig {
@@ -52,12 +73,28 @@ public struct GatewayConfig: Sendable {
 
         let allowed = parseTokenSet(env["OAUTH_GATEWAY_ALLOWED_CLIENT_IDS"])
 
+        let requireClientAPIKey: Bool
+        if let raw = env["LATR_GATEWAY_REQUIRE_CLIENT_API_KEY"] {
+            requireClientAPIKey = parseBool(raw)
+        } else {
+            requireClientAPIKey = appEnv == .prod
+        }
+
+        let clientAPIKeys = parseClientAPIKeys(env["LATR_GATEWAY_CLIENT_API_KEYS"])
+        let clientRegistryURL = resolvedClientRegistryURL(from: env)
+        let registrationSecret = env["LATR_GATEWAY_CLIENT_REGISTRATION_SECRET"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
         return GatewayConfig(
             port: port,
             appEnv: appEnv,
             plcURL: plcURL,
             oauthRequireKnownClient: requireKnown,
-            oauthAllowedClientIDs: allowed
+            oauthAllowedClientIDs: allowed,
+            requireClientAPIKey: requireClientAPIKey,
+            clientAPIKeys: clientAPIKeys,
+            clientRegistryURL: clientRegistryURL,
+            clientRegistrationSecret: registrationSecret?.isEmpty == false ? registrationSecret : nil
         )
     }
 }
@@ -73,4 +110,13 @@ private func parseTokenSet(_ value: String?) -> Set<String> {
     }
     let parts = value.split { $0.isWhitespace || $0 == "," }.map(String.init)
     return Set(parts.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })
+}
+
+private func resolvedClientRegistryURL(from env: [String: String]) -> URL {
+    let raw = env["LATR_GATEWAY_CLIENT_REGISTRY_PATH"]?
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    if let raw, !raw.isEmpty {
+        return URL(fileURLWithPath: raw)
+    }
+    return GatewayConfig.defaultClientRegistryURL()
 }

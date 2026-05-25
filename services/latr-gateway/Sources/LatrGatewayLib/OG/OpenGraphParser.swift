@@ -132,13 +132,3 @@ public func parseOpenGraphMarkup(html: String, resolvedPageURL: String) -> OpenG
         author: author
     )
 }
-
-public func openGraphMetadata(from fields: OpenGraphFields) -> OpenGraphMetadata {
-    OpenGraphMetadata(
-        title: fields.title,
-        description: fields.description,
-        image: fields.image,
-        siteName: fields.siteName,
-        author: fields.author
-    )
-}

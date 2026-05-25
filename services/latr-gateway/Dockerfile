@@ -3,6 +3,7 @@
 FROM swift:6.0-jammy AS builder
 
 WORKDIR /src
+COPY packages/latr-kit/ ./packages/latr-kit/
 COPY services/latr-gateway/ ./services/latr-gateway/
 
 WORKDIR /src/services/latr-gateway

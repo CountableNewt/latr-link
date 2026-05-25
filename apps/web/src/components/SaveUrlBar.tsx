@@ -52,7 +52,7 @@ export function SaveUrlBar() {
           setFeedback({ mode: "debug", detail: "Saved AT Proto record." });
         }
       } else {
-        await repo.saveExternalUrl(resolved.normalizedUrl);
+        await repo.saveExternalUrl(resolved.url);
         setFeedback({ mode: "plain", text: "Saved link." });
       }
       setPaste("");

@@ -16,7 +16,7 @@ latr-link/
     web/           # Next.js web client (Bun)
   packages/
     lexicons/    # com.latr.* lexicon JSON
-    latr-kit/    # URL normalization, rkey helpers, shared types
+    latr-kit/    # Swift LatrKit library
   docs/
     architecture/
 ```

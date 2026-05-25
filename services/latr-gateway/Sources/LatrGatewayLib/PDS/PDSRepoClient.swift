@@ -1,8 +1,9 @@
 import AsyncHTTPClient
 import Foundation
+import LatrKit
 import NIOCore
 
-public struct PDSRepoClient: LatrRepoClient, Sendable {
+public struct PDSRepositoryClient: RepositoryClient, Sendable {
     private let auth: AuthContext
     private let plcURL: String
     private let httpClient: HTTPClient
@@ -126,42 +127,42 @@ public struct PDSRepoClient: LatrRepoClient, Sendable {
         return (try JSONSerialization.jsonObject(with: Data(buffer: responseBody)) as? [String: Any]) ?? [:]
     }
 
-    public func listRecords<T: Codable & Sendable>(
-        repo: String,
-        collection: String,
+    public func listRecords<Value>(
+        in repository: String,
+        collection: LexiconCollection,
         limit: Int?,
-        cursor: String?
-    ) async throws -> ListRecordsPage<T> {
+        startingAfter cursor: String?
+    ) async throws -> RecordList<Value> where Value: Codable & Sendable {
         var query: [String: String] = [
-            "repo": repo,
-            "collection": collection,
+            "repo": repository,
+            "collection": collection.identifier,
             "limit": String(limit ?? 100),
         ]
         if let cursor { query["cursor"] = cursor }
 
         let json = try await xrpcGet(method: "com.atproto.repo.listRecords", query: query)
         let rawRecords = json["records"] as? [[String: Any]] ?? []
-        let records: [RepoRecord<T>] = try rawRecords.compactMap { entry in
+        let records: [RepositoryRecord<Value>] = try rawRecords.compactMap { entry in
             guard let uri = entry["uri"] as? String,
                   let cid = entry["cid"] as? String,
                   let value = entry["value"]
             else { return nil }
             let valueData = try JSONSerialization.data(withJSONObject: value)
-            let decoded = try JSONDecoder().decode(T.self, from: valueData)
-            return RepoRecord(uri: uri, cid: cid, value: decoded)
+            let decoded = try JSONDecoder().decode(Value.self, from: valueData)
+            return RepositoryRecord(uri: uri, cid: cid, value: decoded)
         }
         let nextCursor = json["cursor"] as? String
-        return ListRecordsPage(records: records, cursor: nextCursor)
+        return RecordList(records: records, cursor: nextCursor)
     }
 
-    public func getRecord<T: Codable & Sendable>(
-        repo: String,
-        collection: String,
-        rkey: String
-    ) async throws -> RepoRecord<T>? {
+    public func record<Value>(
+        in repository: String,
+        collection: LexiconCollection,
+        withKey key: String
+    ) async throws -> RepositoryRecord<Value>? where Value: Codable & Sendable {
         let json = try await xrpcGet(
             method: "com.atproto.repo.getRecord",
-            query: ["repo": repo, "collection": collection, "rkey": rkey]
+            query: ["repo": repository, "collection": collection.identifier, "rkey": key]
         )
         guard let uri = json["uri"] as? String,
               let cid = json["cid"] as? String,
@@ -170,63 +171,67 @@ public struct PDSRepoClient: LatrRepoClient, Sendable {
             return nil
         }
         let valueData = try JSONSerialization.data(withJSONObject: value)
-        let decoded = try JSONDecoder().decode(T.self, from: valueData)
-        return RepoRecord(uri: uri, cid: cid, value: decoded)
+        let decoded = try JSONDecoder().decode(Value.self, from: valueData)
+        return RepositoryRecord(uri: uri, cid: cid, value: decoded)
     }
 
     public func createRecord(
-        repo: String,
-        collection: String,
-        rkey: String,
-        record: some Encodable & Sendable
-    ) async throws -> CreateRecordResult {
-        let recordData = try JSONEncoder().encode(AnyEncodable(record))
+        in repository: String,
+        collection: LexiconCollection,
+        withKey key: String,
+        value: some Encodable & Sendable
+    ) async throws -> CreateRecordResponse {
+        let recordData = try JSONEncoder().encode(AnyEncodable(value))
         let recordObject = try JSONSerialization.jsonObject(with: recordData) as? [String: Any] ?? [:]
         let json = try await xrpcPost(
             method: "com.atproto.repo.createRecord",
             body: [
-                "repo": repo,
-                "collection": collection,
-                "rkey": rkey,
+                "repo": repository,
+                "collection": collection.identifier,
+                "rkey": key,
                 "record": recordObject,
             ]
         )
         guard let uri = json["uri"] as? String else {
             throw GatewayError(status: .badGateway, message: "PDS createRecord missing uri", code: "pds_error")
         }
-        return CreateRecordResult(uri: uri)
+        return CreateRecordResponse(uri: uri)
     }
 
-    public func putRecord(
-        repo: String,
-        collection: String,
-        rkey: String,
-        record: some Encodable & Sendable
-    ) async throws -> PutRecordResult {
-        let recordData = try JSONEncoder().encode(AnyEncodable(record))
+    public func updateRecord(
+        in repository: String,
+        collection: LexiconCollection,
+        withKey key: String,
+        value: some Encodable & Sendable
+    ) async throws -> UpdateRecordResponse {
+        let recordData = try JSONEncoder().encode(AnyEncodable(value))
         let recordObject = try JSONSerialization.jsonObject(with: recordData) as? [String: Any] ?? [:]
         let json = try await xrpcPost(
             method: "com.atproto.repo.putRecord",
             body: [
-                "repo": repo,
-                "collection": collection,
-                "rkey": rkey,
+                "repo": repository,
+                "collection": collection.identifier,
+                "rkey": key,
                 "record": recordObject,
             ]
         )
         guard let uri = json["uri"] as? String else {
             throw GatewayError(status: .badGateway, message: "PDS putRecord missing uri", code: "pds_error")
         }
-        return PutRecordResult(uri: uri)
+        return UpdateRecordResponse(uri: uri)
     }
 
-    public func deleteRecord(repo: String, collection: String, rkey: String) async throws {
+    public func deleteRecord(
+        in repository: String,
+        collection: LexiconCollection,
+        withKey key: String
+    ) async throws {
         _ = try await xrpcPost(
             method: "com.atproto.repo.deleteRecord",
             body: [
-                "repo": repo,
-                "collection": collection,
-                "rkey": rkey,
+                "repo": repository,
+                "collection": collection.identifier,
+                "rkey": key,
             ]
         )
     }

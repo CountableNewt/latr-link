@@ -1,18 +1,36 @@
 import AsyncHTTPClient
 import Foundation
 import Hummingbird
+import LatrKit
 
 public struct GatewayServices: Sendable {
     public let config: GatewayConfig
     public let httpClient: HTTPClient
+    public let clientRegistry: ClientRegistry
 
-    public init(config: GatewayConfig, httpClient: HTTPClient) {
+    public init(config: GatewayConfig, httpClient: HTTPClient, clientRegistry: ClientRegistry) {
         self.config = config
         self.httpClient = httpClient
+        self.clientRegistry = clientRegistry
     }
 
-    public func pdsClient(auth: AuthContext) -> PDSRepoClient {
-        PDSRepoClient(auth: auth, plcURL: config.plcURL, httpClient: httpClient)
+    public static func make(config: GatewayConfig, httpClient: HTTPClient) -> GatewayServices {
+        GatewayServices(
+            config: config,
+            httpClient: httpClient,
+            clientRegistry: ClientRegistry(
+                bootstrapKeys: config.clientAPIKeys,
+                registryURL: config.clientRegistryURL
+            )
+        )
+    }
+
+    public func repositoryClient(for auth: AuthContext) -> PDSRepositoryClient {
+        PDSRepositoryClient(auth: auth, plcURL: config.plcURL, httpClient: httpClient)
+    }
+
+    public func savedLibrary(for auth: AuthContext) -> SavedLibrary {
+        SavedLibrary(repository: repositoryClient(for: auth), repositoryDID: auth.did)
     }
 }
 
@@ -24,6 +42,7 @@ public struct HealthResponse: Encodable, Sendable {
 public struct AuthProbeResponse: Encodable, Sendable {
     public let ok: Bool
     public let did: String
+    public let clientId: String?
     public let pdsWriteThrough: Bool
     public let sampleCount: Int
     public let upstreamDpop: Bool
@@ -71,11 +90,11 @@ public struct SimpleOKResponse: Encodable, Sendable {
 }
 
 public struct SavedItemsResponse: Encodable, Sendable {
-    public let records: [RepoRecord<SavedItemRecord>]
+    public let records: [RepositoryRecord<SavedItem>]
 }
 
 public struct SavedItemLookupResponse: Encodable, Sendable {
-    public let record: RepoRecord<SavedItemRecord>?
+    public let record: RepositoryRecord<SavedItem>?
 }
 
 public struct OGPreviewFailureResponse: Encodable, Sendable {
@@ -92,20 +111,61 @@ public func buildRouter(services: GatewayServices) -> Router<BasicRequestContext
 
     let latr = router.group("v1/latr")
 
+    latr.post("clients/register") { request, _ in
+        do {
+            try assertRegistrationAuthorized(request.headers, config: services.config)
+            let body = try await decodeJSONBody(request, as: RegisterClientBody.self)
+            let registered = try await services.clientRegistry.registerClient(
+                clientID: body.clientId,
+                displayName: body.displayName
+            )
+            return try jsonResponse(registered, status: .created)
+        } catch {
+            return errorResponse(error)
+        }
+    }
+
+    latr.get("clients") { request, _ in
+        do {
+            try assertRegistrationAuthorized(request.headers, config: services.config)
+            let clients = await services.clientRegistry.listClients()
+            return try jsonResponse(ListClientsResponse(clients: clients))
+        } catch {
+            return errorResponse(error)
+        }
+    }
+
+    latr.delete("clients/:clientId") { request, context in
+        do {
+            try assertRegistrationAuthorized(request.headers, config: services.config)
+            let clientId = (try? context.parameters.require("clientId"))
+                ?? request.uri.path.split(separator: "/").last.map(String.init)
+                ?? ""
+            let decoded = clientId.removingPercentEncoding ?? clientId
+            guard !decoded.isEmpty else {
+                throw GatewayError(status: .notFound, message: "Gateway client not found", code: "client_not_found")
+            }
+            _ = try await services.clientRegistry.revokeClient(clientID: decoded)
+            return try jsonResponse(SimpleOKResponse(ok: true))
+        } catch {
+            return errorResponse(error)
+        }
+    }
+
     latr.post("auth/probe") { request, _ in
         try await handleProtected(request: request, services: services) { auth in
-            let client = services.pdsClient(auth: auth)
-            let page = try await client.listRecords(
-                repo: auth.did,
-                collection: Collection.savedItem,
+            let page: RecordList<SavedItem> = try await services.repositoryClient(for: auth).listRecords(
+                in: auth.did,
+                collection: .savedItem,
                 limit: 1,
-                cursor: nil
-            ) as ListRecordsPage<SavedItemRecord>
+                startingAfter: nil
+            )
 
             return try jsonResponse(
                 AuthProbeResponse(
                     ok: true,
                     did: auth.did,
+                    clientId: auth.clientID,
                     pdsWriteThrough: true,
                     sampleCount: page.records.count,
                     upstreamDpop: auth.upstreamDpopProof != nil
@@ -116,8 +176,8 @@ public func buildRouter(services: GatewayServices) -> Router<BasicRequestContext
 
     latr.get("saves") { request, _ in
         try await handleProtected(request: request, services: services) { auth in
-            let client = services.pdsClient(auth: auth)
-            let items = try await listSavedItems(client: client, did: auth.did)
+            let library = services.savedLibrary(for: auth)
+            let items = try await library.savedItems()
             return try jsonResponse(SavedItemsResponse(records: items))
         }
     }
@@ -125,30 +185,28 @@ public func buildRouter(services: GatewayServices) -> Router<BasicRequestContext
     latr.post("saves") { request, _ in
         try await handleProtected(request: request, services: services) { auth in
             let body = try await decodeJSONBody(request, as: SaveBody.self)
-            let client = services.pdsClient(auth: auth)
+            let library = services.savedLibrary(for: auth)
 
             switch body {
             case let .url(url):
                 let ogFields = await fetchOpenGraphMetadata(url: url, httpClient: services.httpClient)
-                let og = ogFields.map(openGraphMetadata(from:))
-                try await saveExternalURL(client: client, did: auth.did, url: url, og: og)
+                let preview = ogFields.map(openGraphPreview(from:))
+                try await library.save(url: url, preview: preview)
                 return try jsonResponse(SaveOKResponse(ok: true, kind: "url"), status: .created)
             case let .subject(subjectURI, linkedWebURL):
                 let linked = linkedWebURL?.trimmingCharacters(in: .whitespacesAndNewlines)
-                let og: OpenGraphMetadata?
+                let preview: OpenGraphPreview?
                 if let linked, !linked.isEmpty,
                    let ogFields = await fetchOpenGraphMetadata(url: linked, httpClient: services.httpClient)
                 {
-                    og = openGraphMetadata(from: ogFields)
+                    preview = openGraphPreview(from: ogFields)
                 } else {
-                    og = nil
+                    preview = nil
                 }
-                try await saveSubjectURI(
-                    client: client,
-                    did: auth.did,
+                try await library.save(
                     subjectURI: subjectURI,
                     linkedWebURL: linkedWebURL,
-                    og: og
+                    preview: preview
                 )
                 return try jsonResponse(SaveOKResponse(ok: true, kind: "subject"), status: .created)
             }
@@ -164,9 +222,9 @@ public func buildRouter(services: GatewayServices) -> Router<BasicRequestContext
                 throw GatewayError(status: .badRequest, message: "missing subjectUri", code: "missing_subject")
             }
 
-            let client = services.pdsClient(auth: auth)
-            let rkey = rkeyFromSubjectURI(subjectURI)
-            let record = try await getSavedItem(client: client, did: auth.did, rkey: rkey)
+            let library = services.savedLibrary(for: auth)
+            let key = RecordKey.key(forSubjectURI: subjectURI)
+            let record = try await library.savedItem(withKey: key)
             return try jsonResponse(SavedItemLookupResponse(record: record))
         }
     }
@@ -181,15 +239,10 @@ public func buildRouter(services: GatewayServices) -> Router<BasicRequestContext
                 throw GatewayError(status: .notFound, message: "Not found", code: "not_found")
             }
             let body = try await decodeJSONBody(request, as: StatePatchBody.self)
-            let client = services.pdsClient(auth: auth)
+            let library = services.savedLibrary(for: auth)
             do {
-                try await setSavedItemState(
-                    client: client,
-                    did: auth.did,
-                    itemRkey: decodedRkey,
-                    state: body.state
-                )
-            } catch RecordsError.savedItemNotFound {
+                try await library.setState(ofSavedItemWithKey: decodedRkey, to: body.state)
+            } catch SavedLibraryError.itemNotFound {
                 throw GatewayError(status: .notFound, message: "Saved item not found", code: "not_found")
             }
             return try jsonResponse(SimpleOKResponse(ok: true))
@@ -205,8 +258,8 @@ public func buildRouter(services: GatewayServices) -> Router<BasicRequestContext
             guard !decodedRkey.isEmpty else {
                 throw GatewayError(status: .notFound, message: "Not found", code: "not_found")
             }
-            let client = services.pdsClient(auth: auth)
-            try await deleteSavedItem(client: client, did: auth.did, itemRkey: decodedRkey)
+            let library = services.savedLibrary(for: auth)
+            try await library.removeSavedItem(withKey: decodedRkey)
             return try jsonResponse(SimpleOKResponse(ok: true))
         }
     }
@@ -250,13 +303,27 @@ public func buildRouter(services: GatewayServices) -> Router<BasicRequestContext
     return router
 }
 
+private func openGraphPreview(from fields: OpenGraphFields) -> OpenGraphPreview {
+    OpenGraphPreview(
+        title: fields.title,
+        description: fields.description,
+        image: fields.image,
+        siteName: fields.siteName,
+        author: fields.author
+    )
+}
+
 private func handleProtected(
     request: Request,
     services: GatewayServices,
     handler: (AuthContext) async throws -> Response
 ) async -> Response {
     do {
-        let auth = try authenticateRequest(request, config: services.config)
+        let auth = try await authenticateRequest(
+            request,
+            config: services.config,
+            registry: services.clientRegistry
+        )
         return try await handler(auth)
     } catch {
         return errorResponse(error)

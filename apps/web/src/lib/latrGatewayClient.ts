@@ -3,6 +3,10 @@ import type { OAuthSession } from "@atproto/oauth-client-browser";
 /** Matches gateway `X-ATProto-Upstream-DPoP` for PDS-bound write-through proofs. */
 export const LATR_UPSTREAM_DPOP_HEADER = "X-ATProto-Upstream-DPoP";
 
+/** Matches gateway client API key headers for registered first-party apps. */
+export const LATR_CLIENT_ID_HEADER = "X-Latr-Client-Id";
+export const LATR_API_KEY_HEADER = "X-Latr-API-Key";
+
 export function latrGatewayBaseUrl(): string {
   return (
     process.env.NEXT_PUBLIC_LATR_GATEWAY_URL ?? "http://127.0.0.1:8080"
@@ -15,10 +19,19 @@ export async function latrGatewayFetch(
   init?: RequestInit
 ): Promise<Response> {
   const url = `${latrGatewayBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`;
+  const clientId = process.env.NEXT_PUBLIC_LATR_GATEWAY_CLIENT_ID?.trim();
+  const apiKey = process.env.NEXT_PUBLIC_LATR_GATEWAY_API_KEY?.trim();
+  const clientHeaders: Record<string, string> = {};
+  if (clientId && apiKey) {
+    clientHeaders[LATR_CLIENT_ID_HEADER] = clientId;
+    clientHeaders[LATR_API_KEY_HEADER] = apiKey;
+  }
+
   return oauthSession.fetchHandler(url, {
     ...init,
     headers: {
       Accept: "application/json",
+      ...clientHeaders,
       ...(init?.headers ?? {}),
     },
   });

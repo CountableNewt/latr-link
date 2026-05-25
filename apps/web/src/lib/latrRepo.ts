@@ -5,11 +5,11 @@
 import { Agent } from "@atproto/api";
 import type { OAuthSession } from "@atproto/oauth-client-browser";
 import { AtUri } from "@atproto/syntax";
-import type { RepoRecord, SavedItemRecord } from "latr-kit";
+import type { RepoRecord, SavedItemRecord } from "@/lib/latrRecords";
 
 import { latrGatewayJson } from "@/lib/latrGatewayClient";
 
-export type { RepoRecord } from "latr-kit";
+export type { RepoRecord } from "@/lib/latrRecords";
 
 export class LatrRepo {
   private readAgent: Agent;

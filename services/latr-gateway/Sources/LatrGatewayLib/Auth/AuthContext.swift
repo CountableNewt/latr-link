@@ -7,17 +7,21 @@ public struct AuthContext: Sendable {
     public let authorizationHeader: String
     public let dpopProof: String
     public let upstreamDpopProof: String?
+    /// Registered gateway client when `LATR_GATEWAY_REQUIRE_CLIENT_API_KEY` is enabled.
+    public let clientID: String?
 
     public init(
         did: String,
         authorizationHeader: String,
         dpopProof: String,
-        upstreamDpopProof: String? = nil
+        upstreamDpopProof: String? = nil,
+        clientID: String? = nil
     ) {
         self.did = did
         self.authorizationHeader = authorizationHeader
         self.dpopProof = dpopProof
         self.upstreamDpopProof = upstreamDpopProof
+        self.clientID = clientID
     }
 }
 
@@ -157,7 +161,16 @@ private func assertDPOPStructure(_ proof: String) throws {
     }
 }
 
-public func authenticateRequest(_ request: Request, config: GatewayConfig) throws -> AuthContext {
+public func authenticateRequest(
+    _ request: Request,
+    config: GatewayConfig,
+    registry: ClientRegistry
+) async throws -> AuthContext {
+    let clientID = try await registry.resolveClientID(
+        from: request.headers,
+        requireClientAPIKey: config.requireClientAPIKey
+    )
+
     guard let authorization = request.headers[.authorization]?
         .trimmingCharacters(in: .whitespacesAndNewlines),
         !authorization.isEmpty
@@ -197,7 +210,8 @@ public func authenticateRequest(_ request: Request, config: GatewayConfig) throw
         did: did,
         authorizationHeader: authorization,
         dpopProof: dpop,
-        upstreamDpopProof: upstream
+        upstreamDpopProof: upstream,
+        clientID: clientID
     )
 }
 

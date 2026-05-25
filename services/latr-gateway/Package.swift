@@ -10,6 +10,7 @@ let package = Package(
         .executable(name: "LatrGateway", targets: ["LatrGateway"]),
     ],
     dependencies: [
+        .package(path: "../../packages/latr-kit"),
         .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.0.0"),
         .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.25.0"),
     ],
@@ -17,6 +18,7 @@ let package = Package(
         .target(
             name: "LatrGatewayLib",
             dependencies: [
+                .product(name: "LatrKit", package: "latr-kit"),
                 .product(name: "Hummingbird", package: "hummingbird"),
                 .product(name: "AsyncHTTPClient", package: "async-http-client"),
             ],

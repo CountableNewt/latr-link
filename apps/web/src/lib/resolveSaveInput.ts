@@ -2,7 +2,6 @@
  * Decide whether a pasted string should save as a native AT subject or as an external URL.
  */
 import { AtUri } from "@atproto/syntax";
-import { normalizeUrl } from "latr-kit";
 
 import { publicAppviewAgent } from "@/lib/appview";
 import { tryCanonicalAtUri } from "@/lib/canonicalAtUri";
@@ -19,7 +18,7 @@ export type ResolvedSavePaste =
       discoveryWebUrl?: string;
       via: "at-uri" | "bsky-app" | "standard-site";
     }
-  | { kind: "external"; normalizedUrl: string };
+  | { kind: "external"; url: string };
 
 /** `https:` / `http:` URL, optionally prepending https when no scheme */
 export function tryParseHttpUrl(trimmedInput: string): URL | null {
@@ -60,7 +59,7 @@ export function extractBskyAppProfilePostParts(
 }
 
 function discoveryWebUrlFromHttpPaste(httpUrl: URL): string {
-  return normalizeUrl(httpUrl.href) ?? httpUrl.href;
+  return httpUrl.href;
 }
 
 async function actorToDid(actor: string): Promise<string | null> {
@@ -144,10 +143,5 @@ export async function resolvePasteForSave(
     /* non-fatal */
   }
 
-  const normalized = normalizeUrl(httpUrl.href);
-  if (!normalized) {
-    throw new Error("Invalid or unsupported URL.");
-  }
-
-  return { kind: "external", normalizedUrl: normalized };
+  return { kind: "external", url: httpUrl.href };
 }

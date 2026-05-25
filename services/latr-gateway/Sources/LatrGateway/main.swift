@@ -10,7 +10,7 @@ struct LatrGatewayApp {
         let config = GatewayConfig.load()
         let httpClient = HTTPClient(eventLoopGroupProvider: .singleton)
 
-        let services = GatewayServices(config: config, httpClient: httpClient)
+        let services = GatewayServices.make(config: config, httpClient: httpClient)
         let router = buildRouter(services: services)
         let app = Application(
             router: router,

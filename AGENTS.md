@@ -1,10 +1,10 @@
 ## Workspace facts
 
-- **Git remotes — origin is Tangled, vercel is GitHub.** This repo tracks Tangled on **`origin`** (`git@tangled.org:did:plc:jq2bt674bkbf6n53zxzmlixv`) and GitHub on **`vercel`** (`github.com/Stygian-Tech/latr-link`). After a commit that should appear on both forges: `git push origin <branch> && git push vercel <branch>` (replace `<branch>` with the active branch).
+- **Git remotes — origin is GitHub, tangled is Tangled.** This repo tracks GitHub on **`origin`** (`github.com/Stygian-Tech/latr-link`) and Tangled on **`tangled`** (`git@tangled.org:did:plc:jq2bt674bkbf6n53zxzmlixv`). After a commit that should appear on both forges: `git push origin <branch> && git push tangled <branch>` (replace `<branch>` with the active branch).
 - Monorepo root: Bun workspaces (`apps/*`, `packages/*`, `services/*`) + Turborepo.
 - Web app: `apps/web` (package name `web`). Run checks with `bash scripts/ci.sh` or `bun run turbo run build --filter=web...`.
 - Gateway: `services/latr-gateway` — Swift/Hummingbird HTTP service: OAuth/DPoP gate, PDS write-through for L@tr saves. Local: `cd services/latr-gateway && swift run LatrGateway` (port 8080). Web uses `NEXT_PUBLIC_LATR_GATEWAY_URL`.
-- Shared logic: `packages/latr-kit` (import as `latr-kit` in `apps/web`; record orchestration lives in the Swift gateway).
+- Shared logic: **`packages/latr-kit`** — Swift **`LatrKit`** framework (Apple-style API) for all server-side record workflows.
 
 ## Conventions
 
@@ -17,8 +17,12 @@
 - Canonical user-facing product title/branding: **L@tr.link** (metadata and primary headings), not abbreviated variants unless requested.
 - When following an attached implementation plan in this repo: do not edit the plan artifact; reuse existing todos and update their status rather than creating duplicates.
 - Favicon and Apple touch icons should be PNGs with transparency outside the blue squircle; OG/social artwork can remain full-bleed.
+- Server-side code in this repo should be **Swift on Hummingbird** (replace TypeScript/Bun services rather than adding parallel runtimes).
+- **`LatrKit` is Swift-only** with Apple-style API naming (`SavedLibrary`, `RepositoryClient`, preposition-first methods); web lexicon types live in `apps/web`, not a TypeScript package under `packages/latr-kit`.
+- Prefer **on-protocol storage** for saved metadata, including Open Graph fields on `com.latr.saved.*` records.
 
 ## Learned Workspace Facts
 
-- **the-social-wire**: sibling Turborepo under the same parent as this repo (`../the-social-wire`) — reference for monorepo layout, Next/App Router patterns, and ATProto client habits when aligning tooling.
-- **latr.link** product shape: ATProto read-later — saved data lives as `com.latr.saved.external` / `com.latr.saved.item` on the signed-in user’s PDS (`packages/latr-kit`, `packages/lexicons`). Save/list/state run through `services/latr-gateway`; see `docs/architecture/latr-gateway.md`.
+- **the-social-wire**: sibling Turborepo under the same parent as this repo (`../the-social-wire`) — reference for monorepo layout, gateway patterns, and eventual shared `LatrKit` integration for a unified L@tr experience across platforms.
+- **latr.link** product shape: ATProto read-later — saved data lives as `com.latr.saved.external` / `com.latr.saved.item` on the signed-in user’s PDS with Open Graph metadata stored on-protocol (`packages/latr-kit`, `packages/lexicons`). Save/list/state run through `services/latr-gateway` (web is a thin OAuth client); see `docs/architecture/latr-gateway.md`.
+- **GitHub Actions CI**: `.github/workflows/ci.yml` runs `bash scripts/ci.sh` on pushes and pull requests to `main` and `dev`.
