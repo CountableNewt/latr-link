@@ -19,9 +19,12 @@
 - When following an attached implementation plan in this repo: do not edit the plan artifact; reuse existing todos and update their status rather than creating duplicates.
 - Favicon and Apple touch icons should be PNGs with transparency outside the blue squircle; OG/social artwork can remain full-bleed.
 - Server-side code in this repo should be **Swift on Hummingbird** (replace TypeScript/Bun services rather than adding parallel runtimes).
-- **`LatrKit` is Swift-only** with Apple-style API naming (`SavedLibrary`, `RepositoryClient`, preposition-first methods); web record keys and gateway header constants come from **`latr-packages`** (`latr-packages/record-keys`, `latr-packages/gateway-client`), not duplicated in `apps/web`.
+- **`LatrKit` is Swift-only** with Apple-style API naming (`SavedLibrary`, `RepositoryClient`, preposition-first methods); web record keys, gateway headers, and upstream DPoP proof pools come from **`latr-packages`** (`latr-packages/record-keys`, `latr-packages/gateway-client`), not duplicated in `apps/web`.
 - Prefer **on-protocol storage** for saved metadata, including Open Graph fields on `com.latr.saved.*` records.
 - Stygian openness model: three tiers — hosted SaaS, self-hosted reference services, and build-your-own public packages; hybrid repo split (focused foundation repos + grouped product-domain repos until APIs settle).
+- Public foundation packages use descriptive names (`ATProtoPrimitiveKit`, `ATProtoAuthKit`, …), not a `Stygian` prefix; app-specific packages (`latr-kit`, `latr-packages`, …) keep product names.
+- Shared package dependencies should resolve via git/npm/SwiftPM remotes — not sibling local paths — so CI and contributors run without monorepo-local checkouts.
+- Swift gateway CI should treat compiler warnings as errors.
 
 ## Learned Workspace Facts
 
@@ -31,3 +34,5 @@
 - **Gateway client auth**: registered apps (`latr-web`, `social-wire`, …) send `X-Latr-Client-Id` / `X-Latr-API-Key` on `/v1/latr/*` (enforced when `APP_ENV=prod`); register via `POST /v1/latr/clients/register`. See `docs/architecture/latr-gateway.md`.
 - **latr.link** product shape: ATProto read-later — saved data lives as `com.latr.saved.external` / `com.latr.saved.item` on the signed-in user’s PDS with Open Graph metadata stored on-protocol (`latr-packages` lexicons + GitHub **`Stygian-Tech/latr-kit`**). Save/list/state run through `services/latr-gateway` (web is a thin OAuth client); see `docs/architecture/latr-gateway.md`.
 - **GitHub Actions CI**: `.github/workflows/ci.yml` on **`origin`** — runs `bash scripts/ci.sh` on pushes/PRs to `main` and `dev`; on push, deploys latr-gateway to Fly when gateway paths change (`scripts/fly-deploy-gateway.sh`, GitHub secret **`FLY_API_TOKEN`**).
+- **Hosted testing**: web at **`testing.latr.link`** (Vercel); gateway at **`api.testing.latr.link`** (Fly dev). Set **`NEXT_PUBLIC_LATR_GATEWAY_URL=https://api.testing.latr.link`** on the testing web deployment.
+- **Upstream DPoP**: web clients precompute proofs via **`latr-packages/gateway-client`** (`createUpstreamDpopProof`, `createUpstreamDpopProofPool`, `createSaveUpstreamDpopProofPool`); gateway consumes them through **`UpstreamProofPool`** (one proof per PDS XRPC call).

@@ -7,6 +7,7 @@ public struct PDSRepositoryClient: RepositoryClient, Sendable {
     private let auth: AuthContext
     private let plcURL: String
     private let httpClient: HTTPClient
+    private let upstreamPool: UpstreamProofPool
     private let fetchData: @Sendable (URL) async throws -> Data
 
     public init(
@@ -18,6 +19,7 @@ public struct PDSRepositoryClient: RepositoryClient, Sendable {
         self.auth = auth
         self.plcURL = plcURL
         self.httpClient = httpClient
+        self.upstreamPool = UpstreamProofPool(rawHeader: auth.upstreamDpopProof)
         self.fetchData = fetchData ?? { url in
             var request = HTTPClientRequest(url: url.absoluteString)
             request.headers.add(name: "Accept", value: "application/json")
@@ -42,52 +44,6 @@ public struct PDSRepositoryClient: RepositoryClient, Sendable {
         return base
     }
 
-    private func decodeJWTClaimString(_ jwt: String, claim: String) -> String? {
-        let parts = jwt.split(separator: ".", omittingEmptySubsequences: false)
-        guard parts.count >= 2 else { return nil }
-
-        var payloadB64 = String(parts[1])
-            .replacingOccurrences(of: "-", with: "+")
-            .replacingOccurrences(of: "_", with: "/")
-        let padding = (4 - payloadB64.count % 4) % 4
-        payloadB64.append(String(repeating: "=", count: padding))
-
-        guard let data = Data(base64Encoded: payloadB64),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let value = json[claim] as? String
-        else {
-            return nil
-        }
-        return value
-    }
-
-    private func upstreamProofTargets(xrpcMethod: String) -> Bool {
-        guard let upstream = auth.upstreamDpopProof?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !upstream.isEmpty,
-              let htu = decodeJWTClaimString(upstream, claim: "htu")
-        else {
-            return false
-        }
-        let normalized = htu.split(separator: "?").first.map(String.init) ?? htu
-        return normalized.hasSuffix("/xrpc/\(xrpcMethod)")
-    }
-
-    /// PDS-bound proof for repo mutations. Reuses upstream only when its `htu` matches this XRPC method.
-    private func pdsMutationDPOPProof(forXrpcMethod method: String) -> String {
-        if upstreamProofTargets(xrpcMethod: method),
-           let upstream = auth.upstreamDpopProof?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !upstream.isEmpty
-        {
-            return upstream
-        }
-        return auth.dpopProof
-    }
-
-    /// PDS-bound proof for authenticated repo reads (`listRecords`).
-    private func pdsReadDPOPProof(forXrpcMethod method: String) -> String {
-        pdsMutationDPOPProof(forXrpcMethod: method)
-    }
-
     private func isRecordNotFound(statusCode: Int, json: [String: Any]) -> Bool {
         if statusCode == 404 { return true }
         guard statusCode == 400 else { return false }
@@ -99,18 +55,28 @@ public struct PDSRepositoryClient: RepositoryClient, Sendable {
     }
 
     private func xrpcPost(method: String, body: [String: Any]) async throws -> [String: Any] {
-        let base = try await pdsBase()
-        guard let url = URL(string: "\(base)/xrpc/\(method)") else {
+        let requestURL: String
+        let dpopProof: String
+        if let consumed = upstreamPool.consume(forXrpcMethod: method, httpMethod: "POST") {
+            requestURL = consumed.url
+            dpopProof = consumed.proof
+        } else {
+            let base = try await pdsBase()
+            requestURL = "\(base)/xrpc/\(method)"
+            dpopProof = auth.dpopProof
+        }
+
+        guard URL(string: requestURL) != nil else {
             throw GatewayError(status: .badGateway, message: "Invalid PDS URL", code: "pds_error")
         }
 
         let bodyData = try JSONSerialization.data(withJSONObject: body)
-        var request = HTTPClientRequest(url: url.absoluteString)
+        var request = HTTPClientRequest(url: requestURL)
         request.method = .POST
         request.headers.add(name: "Accept", value: "application/json")
         request.headers.add(name: "Content-Type", value: "application/json")
         request.headers.add(name: "Authorization", value: auth.authorizationHeader)
-        request.headers.add(name: "DPoP", value: pdsMutationDPOPProof(forXrpcMethod: method))
+        request.headers.add(name: "DPoP", value: dpopProof)
         request.body = .bytes(bodyData)
 
         let response = try await httpClient.execute(request, timeout: .seconds(30))
@@ -146,8 +112,24 @@ public struct PDSRepositoryClient: RepositoryClient, Sendable {
     }
 
     private func xrpcGet(method: String, query: [String: String], useAuth: Bool) async throws -> [String: Any] {
-        let base = try await pdsBase()
-        var components = URLComponents(string: "\(base)/xrpc/\(method)")!
+        let xrpcBaseURL: String
+        let dpopProof: String?
+        if useAuth {
+            if let consumed = upstreamPool.consume(forXrpcMethod: method, httpMethod: "GET") {
+                xrpcBaseURL = consumed.url
+                dpopProof = consumed.proof
+            } else {
+                let base = try await pdsBase()
+                xrpcBaseURL = "\(base)/xrpc/\(method)"
+                dpopProof = auth.dpopProof
+            }
+        } else {
+            let base = try await pdsBase()
+            xrpcBaseURL = "\(base)/xrpc/\(method)"
+            dpopProof = nil
+        }
+
+        var components = URLComponents(string: xrpcBaseURL)!
         components.queryItems = query.map { URLQueryItem(name: $0.key, value: $0.value) }
         guard let url = components.url else {
             throw GatewayError(status: .badGateway, message: "Invalid PDS URL", code: "pds_error")
@@ -155,9 +137,9 @@ public struct PDSRepositoryClient: RepositoryClient, Sendable {
 
         var request = HTTPClientRequest(url: url.absoluteString)
         request.headers.add(name: "Accept", value: "application/json")
-        if useAuth {
+        if useAuth, let dpopProof {
             request.headers.add(name: "Authorization", value: auth.authorizationHeader)
-            request.headers.add(name: "DPoP", value: pdsReadDPOPProof(forXrpcMethod: method))
+            request.headers.add(name: "DPoP", value: dpopProof)
         }
 
         let response = try await httpClient.execute(request, timeout: .seconds(30))
@@ -323,6 +305,63 @@ private struct AnyEncodable: Encodable {
 
     func encode(to encoder: Encoder) throws {
         try encodeFunc(encoder)
+    }
+}
+
+private func decodeJWTClaimString(_ jwt: String, claim: String) -> String? {
+    let parts = jwt.split(separator: ".", omittingEmptySubsequences: false)
+    guard parts.count >= 2 else { return nil }
+
+    var payloadB64 = String(parts[1])
+        .replacingOccurrences(of: "-", with: "+")
+        .replacingOccurrences(of: "_", with: "/")
+    let padding = (4 - payloadB64.count % 4) % 4
+    payloadB64.append(String(repeating: "=", count: padding))
+
+    guard let data = Data(base64Encoded: payloadB64),
+          let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          let value = json[claim] as? String
+    else {
+        return nil
+    }
+    return value
+}
+
+/// Consumes one client-minted upstream DPoP proof per matching PDS XRPC call.
+final class UpstreamProofPool: @unchecked Sendable {
+    private let lock = NSLock()
+    private var proofs: [String]
+
+    init(rawHeader: String?) {
+        if let raw = rawHeader?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty {
+            proofs = raw.split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+        } else {
+            proofs = []
+        }
+    }
+
+    func consume(forXrpcMethod method: String, httpMethod: String) -> (proof: String, url: String)? {
+        lock.lock()
+        defer { lock.unlock() }
+
+        for (index, proof) in proofs.enumerated() {
+            guard let htu = decodeJWTClaimString(proof, claim: "htu"),
+                  let htm = decodeJWTClaimString(proof, claim: "htm"),
+                  htm.uppercased() == httpMethod.uppercased()
+            else {
+                continue
+            }
+
+            let normalized = htu.split(separator: "?").first.map(String.init) ?? htu
+            guard normalized.hasSuffix("/xrpc/\(method)") else { continue }
+
+            proofs.remove(at: index)
+            return (proof, normalized)
+        }
+
+        return nil
     }
 }
 

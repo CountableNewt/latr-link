@@ -204,7 +204,13 @@ public func authenticateRequest(
     try assertKnownClient(config: config, payload: payload)
 
     let upstream = extractUpstreamDPOPHeader(from: request.headers)
-    if let upstream { try assertDPOPStructure(upstream) }
+    if let upstream {
+        for proof in upstream.split(separator: ",") {
+            let trimmed = proof.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { continue }
+            try assertDPOPStructure(trimmed)
+        }
+    }
 
     return AuthContext(
         did: did,

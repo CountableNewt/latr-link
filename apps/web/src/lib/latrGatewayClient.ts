@@ -1,14 +1,12 @@
 import type { OAuthSession } from "@atproto/oauth-client-browser";
 import {
+  createSaveUpstreamDpopProofPool,
+  createUpstreamDpopProof,
   LATR_API_KEY_HEADER,
   LATR_CLIENT_ID_HEADER,
   LATR_UPSTREAM_DPOP_HEADER,
-} from "latr-packages/gateway-client";
-
-import {
-  createUpstreamDpopProof,
   pdsXrpcMethodForGatewayRequest,
-} from "@/lib/latrGatewayUpstreamDpop";
+} from "latr-packages/gateway-client";
 import { latrGatewayBaseUrl } from "@/lib/latrGatewayUrl";
 
 export {
@@ -37,7 +35,10 @@ export async function latrGatewayFetch(
 
   const upstream = pdsXrpcMethodForGatewayRequest(method, gatewayPath);
   const upstreamHeaders: Record<string, string> = {};
-  if (upstream) {
+  if (method === "POST" && gatewayPath === "/v1/latr/saves") {
+    upstreamHeaders[LATR_UPSTREAM_DPOP_HEADER] =
+      await createSaveUpstreamDpopProofPool(oauthSession);
+  } else if (upstream) {
     upstreamHeaders[LATR_UPSTREAM_DPOP_HEADER] = await createUpstreamDpopProof(
       oauthSession,
       upstream.xrpcMethod,
