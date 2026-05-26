@@ -5,7 +5,7 @@
 - Web app: `apps/web` (package name `web`). Run checks with `bash scripts/ci.sh` or `bun run turbo run build --filter=web...`.
 - Gateway: `services/latr-gateway` — Swift/Hummingbird HTTP service: registered client API keys + OAuth/DPoP gate, PDS write-through for L@tr saves. Local: `cd services/latr-gateway && swift run LatrGateway` (port 8080). Web uses `NEXT_PUBLIC_LATR_GATEWAY_URL`. Gateway env vars: `services/latr-gateway/.env.example`. Fly/Docker **build context** is the gateway directory (not repo root): `bash deploy.sh dev` runs `prepare-docker.sh` (stages sibling **`../latr-kit`** → `vendor/latr-kit`), then `fly deploy --config fly.toml`.
 - **LatrKit** canonical source: https://github.com/Stygian-Tech/latr-kit — `services/latr-gateway/Package.swift` resolves it via SwiftPM (`branch: main`).
-- Web TS contracts: **`latr-packages`** git dependency at repo root (`github:Stygian-Tech/latr-packages#main`); apps/web maps `@stygian/latr-record-keys` and `@stygian/latr-gateway-client` through that checkout in `node_modules`.
+- Web TS contracts: **`latr-packages`** git dependency at repo root (`github:Stygian-Tech/latr-packages#<commit>`); import via `latr-packages/gateway-client` and `latr-packages/record-keys` with `transpilePackages: ["latr-packages"]` in `next.config.ts`.
 
 ## Conventions
 
@@ -19,7 +19,7 @@
 - When following an attached implementation plan in this repo: do not edit the plan artifact; reuse existing todos and update their status rather than creating duplicates.
 - Favicon and Apple touch icons should be PNGs with transparency outside the blue squircle; OG/social artwork can remain full-bleed.
 - Server-side code in this repo should be **Swift on Hummingbird** (replace TypeScript/Bun services rather than adding parallel runtimes).
-- **`LatrKit` is Swift-only** with Apple-style API naming (`SavedLibrary`, `RepositoryClient`, preposition-first methods); web record keys and gateway header constants come from **`latr-packages`** (`@stygian/latr-record-keys`, `@stygian/latr-gateway-client`), not duplicated in `apps/web`.
+- **`LatrKit` is Swift-only** with Apple-style API naming (`SavedLibrary`, `RepositoryClient`, preposition-first methods); web record keys and gateway header constants come from **`latr-packages`** (`latr-packages/record-keys`, `latr-packages/gateway-client`), not duplicated in `apps/web`.
 - Prefer **on-protocol storage** for saved metadata, including Open Graph fields on `com.latr.saved.*` records.
 - Stygian openness model: three tiers — hosted SaaS, self-hosted reference services, and build-your-own public packages; hybrid repo split (focused foundation repos + grouped product-domain repos until APIs settle).
 

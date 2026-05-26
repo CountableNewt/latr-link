@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  transpilePackages: ["latr-packages"],
   env: {
     NEXT_PUBLIC_APP_ENV:
       process.env.NEXT_PUBLIC_APP_ENV ?? process.env.APP_ENV ?? "",
