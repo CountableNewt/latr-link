@@ -6,6 +6,7 @@
  * (see `apps/web/.env.example`). When unset: `next dev` → **`local`**; Vercel
  * production → **`prod`**; other hosted builds (preview) → **`dev`**.
  */
+import type { LatrAppEnv } from "latr-web-client/latrGatewayConfig";
 
 export type AppEnv = "prod" | "dev" | "local" | (string & {});
 
@@ -29,6 +30,18 @@ export function getAppEnv(): AppEnv {
   if (raw) return normalizeAppEnv(raw);
   if (process.env.NODE_ENV === "development") return "local";
   if (process.env.VERCEL_ENV === "production") return "prod";
+  return "dev";
+}
+
+function isLatrAppEnv(env: string): env is LatrAppEnv {
+  return (
+    env === "local" || env === "dev" || env === "prod" || env === "test"
+  );
+}
+
+/** Maps web `AppEnv` to gateway client config (unknown values → `dev`). */
+export function toLatrGatewayAppEnv(env: AppEnv = getAppEnv()): LatrAppEnv {
+  if (isLatrAppEnv(env)) return env;
   return "dev";
 }
 

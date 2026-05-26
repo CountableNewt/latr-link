@@ -7,7 +7,7 @@ import {
   latrGatewayBaseUrl as sharedLatrGatewayBaseUrl,
 } from "latr-web-client/latrGatewayConfig";
 
-import { getAppEnv } from "@/lib/environmentBanner";
+import { toLatrGatewayAppEnv } from "@/lib/environmentBanner";
 
 export {
   LOCAL_LATR_GATEWAY_URL,
@@ -27,7 +27,7 @@ function syncWebGatewayConfig(): void {
   }
   configureLatrGateway({
     gatewayUrl: process.env.NEXT_PUBLIC_LATR_GATEWAY_URL?.trim(),
-    appEnv: getAppEnv(),
+    appEnv: toLatrGatewayAppEnv(),
     testingHostname,
     clientId: process.env.NEXT_PUBLIC_LATR_GATEWAY_CLIENT_ID?.trim(),
     apiKey: process.env.NEXT_PUBLIC_LATR_GATEWAY_API_KEY?.trim(),
