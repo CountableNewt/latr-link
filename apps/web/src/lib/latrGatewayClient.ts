@@ -1,4 +1,9 @@
 import type { OAuthSession } from "@atproto/oauth-client-browser";
+import {
+  LATR_API_KEY_HEADER,
+  LATR_CLIENT_ID_HEADER,
+  LATR_UPSTREAM_DPOP_HEADER,
+} from "@stygian/latr-gateway-client";
 
 import {
   createUpstreamDpopProof,
@@ -6,12 +11,11 @@ import {
 } from "@/lib/latrGatewayUpstreamDpop";
 import { latrGatewayBaseUrl } from "@/lib/latrGatewayUrl";
 
-/** Matches gateway `X-ATProto-Upstream-DPoP` for PDS-bound write-through proofs. */
-export const LATR_UPSTREAM_DPOP_HEADER = "X-ATProto-Upstream-DPoP";
-
-/** Matches gateway client API key headers for registered first-party apps. */
-export const LATR_CLIENT_ID_HEADER = "X-Latr-Client-Id";
-export const LATR_API_KEY_HEADER = "X-Latr-API-Key";
+export {
+  LATR_API_KEY_HEADER,
+  LATR_CLIENT_ID_HEADER,
+  LATR_UPSTREAM_DPOP_HEADER,
+};
 
 export { latrGatewayBaseUrl } from "@/lib/latrGatewayUrl";
 

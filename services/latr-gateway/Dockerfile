@@ -1,10 +1,9 @@
 # syntax=docker/dockerfile:1
-# Build context: services/latr-gateway (includes vendor/latr-kit from prepare-docker.sh).
+# Build context: services/latr-gateway (LatrKit resolves from GitHub via SwiftPM).
 
 FROM swift:6.1-jammy AS builder
 
 WORKDIR /src
-COPY vendor/latr-kit/ ./packages/latr-kit/
 COPY . ./services/latr-gateway/
 
 WORKDIR /src/services/latr-gateway

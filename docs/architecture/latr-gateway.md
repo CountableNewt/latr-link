@@ -147,7 +147,7 @@ Sign in at `http://127.0.0.1:3000`, then save/list/archive via the library UI.
 
 ## Fly deployment (dev)
 
-Fly builds from **`services/latr-gateway/`** (the app directory). `deploy.sh` stages `packages/latr-kit` into `vendor/latr-kit` before the image build.
+Fly builds from **`services/latr-gateway/`** (the app directory). `deploy.sh` runs `prepare-docker.sh` (no-op; LatrKit resolves from GitHub in SwiftPM), then builds the Docker image.
 
 ```bash
 bash services/latr-gateway/deploy.sh dev
