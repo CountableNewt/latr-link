@@ -2,13 +2,20 @@ import Foundation
 
 enum OpenGraphMerger {
     static func externalSaveNeedsPreview(_ record: ExternalSave) -> Bool {
-        !(record.title?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
-            && record.image?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
+        !hasFilledString(record.title)
+            || !hasFilledString(record.image)
+            || !hasFilledString(record.author)
     }
 
     static func savedItemNeedsPreview(_ record: SavedItem) -> Bool {
-        !(record.previewTitle?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
-            && record.previewImage?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
+        !hasFilledString(record.previewTitle)
+            || !hasFilledString(record.previewImage)
+            || !hasFilledString(record.previewAuthor)
+    }
+
+    private static func hasFilledString(_ value: String?) -> Bool {
+        guard let value else { return false }
+        return !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     static func merging(into existing: ExternalSave, preview: OpenGraphPreview) -> ExternalSave? {

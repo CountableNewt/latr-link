@@ -40,4 +40,33 @@ struct OpenGraphParserTests {
         #expect(parsed.title == "Tom's Guide")
         #expect(parsed.description == "It's 'great'")
     }
+
+    @Test("reads og author and twitter creator fallbacks")
+    func readsAuthorFallbacks() {
+        let html = """
+        <head>
+          <meta property="article:author" content="https://facebook.com/pages/example"/>
+          <meta name="twitter:creator" content="@ada"/>
+        </head>
+        """
+
+        let parsed = parseOpenGraphMarkup(html: html, resolvedPageURL: "https://news.example/item")
+        #expect(parsed.author == "@ada")
+    }
+
+    @Test("reads secure image and JSON-LD author")
+    func readsExtendedMetadata() {
+        let html = """
+        <head>
+          <meta property="og:image:secure_url" content="https://cdn.example/secure.png"/>
+          <script type="application/ld+json">
+            {"@type":"Article","author":{"@type":"Person","name":"Grace Hopper"}}
+          </script>
+        </head>
+        """
+
+        let parsed = parseOpenGraphMarkup(html: html, resolvedPageURL: "https://news.example/item")
+        #expect(parsed.image == "https://cdn.example/secure.png")
+        #expect(parsed.author == "Grace Hopper")
+    }
 }

@@ -148,7 +148,9 @@ public struct SavedLibrary: Sendable {
         let reference = try await ensureExternalSave(for: url, preview: preview)
         _ = try await upsertSavedItem(
             subjectURI: reference.wrapperURI,
-            state: .unread
+            state: .unread,
+            linkedWebURL: reference.normalizedURL,
+            preview: preview
         )
     }
 

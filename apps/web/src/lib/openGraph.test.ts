@@ -56,6 +56,37 @@ describe("parseOpenGraphMarkup", () => {
     });
   });
 
+  test("reads og:author and twitter:creator fallbacks", () => {
+    const html = `<head>
+      <meta property="article:author" content="https://facebook.com/pages/example"/>
+      <meta name="twitter:creator" content="@ada"/>
+    </head>`;
+    expect(parseOpenGraphMarkup(html, "https://z.example")).toEqual({
+      author: "@ada",
+    });
+  });
+
+  test("reads og:image secure/url and image_src fallbacks", () => {
+    const html = `<head>
+      <meta property="og:image:secure_url" content="https://cdn.example/secure.png"/>
+      <link rel="image_src" href="https://cdn.example/legacy.png"/>
+    </head>`;
+    expect(parseOpenGraphMarkup(html, "https://z.example")).toEqual({
+      image: "https://cdn.example/secure.png",
+    });
+  });
+
+  test("reads JSON-LD author", () => {
+    const html = `<head>
+      <script type="application/ld+json">
+        {"@type":"Article","author":{"@type":"Person","name":"Grace Hopper"}}
+      </script>
+    </head>`;
+    expect(parseOpenGraphMarkup(html, "https://z.example")).toEqual({
+      author: "Grace Hopper",
+    });
+  });
+
   test("decodes apostrophe entities in metadata", () => {
     const html = `<head>
       <meta property="og:title" content="Tom&amp;#39;s Guide"/>

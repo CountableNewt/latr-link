@@ -61,6 +61,45 @@ function metaTagContent(
   return undefined;
 }
 
+function linkTagAttribute(
+  scope: string,
+  rel: string,
+  attribute: "href" | "title"
+): string | undefined {
+  const escapedRel = escapeRegExp(rel);
+  const patterns = [
+    new RegExp(
+      `<link\\s[^>]*?rel=["']${escapedRel}["'][^>]*?${attribute}=["']([^"']*)["'][^>]*?>`,
+      "i"
+    ),
+    new RegExp(
+      `<link\\s[^>]*?${attribute}=["']([^"']*)["'][^>]*?rel=["']${escapedRel}["'][^>]*?>`,
+      "i"
+    ),
+  ];
+  for (const re of patterns) {
+    const m = re.exec(scope);
+    if (m?.[1]) return normalizeMetaValue(decodeMinimalEntities(m[1]));
+  }
+  return undefined;
+}
+
+/** Drop URL-only author values (common for article:author). */
+function normalizeAuthorValue(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  const trimmed = stripWhitespace(raw);
+  if (!trimmed) return undefined;
+  if (/^https?:\/\//i.test(trimmed)) return undefined;
+  return trimmed;
+}
+
+function firstDefined<T>(values: Array<T | undefined>): T | undefined {
+  for (const value of values) {
+    if (value !== undefined) return value;
+  }
+  return undefined;
+}
+
 /** First capturing group inside <title>...</title>. */
 function parseDocumentTitle(html: string): string | undefined {
   const m =
@@ -72,6 +111,27 @@ function parseDocumentTitle(html: string): string | undefined {
   );
 }
 
+function parseJsonLdAuthor(html: string): string | undefined {
+  const scriptRe =
+    /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  const authorPatterns = [
+    /"author"\s*:\s*\[\s*\{[^}]*"name"\s*:\s*"([^"]+)"/i,
+    /"author"\s*:\s*\{[^}]*"name"\s*:\s*"([^"]+)"/i,
+    /"author"\s*:\s*"([^"]+)"/i,
+  ];
+
+  for (const match of html.matchAll(scriptRe)) {
+    const block = match[1];
+    if (!block) continue;
+    for (const pattern of authorPatterns) {
+      const authorMatch = pattern.exec(block);
+      const name = normalizeAuthorValue(authorMatch?.[1]);
+      if (name) return name;
+    }
+  }
+  return undefined;
+}
+
 function toAbsoluteHref(resolvedPageUrl: string, raw: string): string | undefined {
   const t = normalizeMetaValue(decodeMinimalEntities(stripWhitespace(raw)));
   if (!t) return undefined;
@@ -80,6 +140,31 @@ function toAbsoluteHref(resolvedPageUrl: string, raw: string): string | undefine
   } catch {
     return undefined;
   }
+}
+
+function parseImage(scope: string, resolvedPageUrl: string): string | undefined {
+  const imgRaw = firstDefined([
+    metaTagContent(scope, "property", "og:image"),
+    metaTagContent(scope, "property", "og:image:secure_url"),
+    metaTagContent(scope, "property", "og:image:url"),
+    metaTagContent(scope, "name", "twitter:image"),
+    metaTagContent(scope, "name", "twitter:image:src"),
+    linkTagAttribute(scope, "image_src", "href"),
+  ]);
+  return imgRaw ? toAbsoluteHref(resolvedPageUrl, imgRaw) ?? imgRaw : undefined;
+}
+
+function parseAuthor(scope: string, html: string): string | undefined {
+  return firstDefined([
+    normalizeAuthorValue(metaTagContent(scope, "property", "og:author")),
+    normalizeAuthorValue(metaTagContent(scope, "name", "author")),
+    normalizeAuthorValue(metaTagContent(scope, "property", "article:author")),
+    normalizeAuthorValue(metaTagContent(scope, "name", "twitter:creator")),
+    normalizeAuthorValue(metaTagContent(scope, "name", "dc.creator")),
+    normalizeAuthorValue(metaTagContent(scope, "name", "DC.creator")),
+    normalizeAuthorValue(linkTagAttribute(scope, "author", "title")),
+    parseJsonLdAuthor(html),
+  ]);
 }
 
 /**
@@ -103,15 +188,8 @@ export function parseOpenGraphMarkup(
     metaTagContent(slice, "name", "description");
 
   const siteName = metaTagContent(slice, "property", "og:site_name");
-
-  const author =
-    metaTagContent(slice, "property", "article:author") ??
-    metaTagContent(slice, "name", "author");
-
-  const imgRaw =
-    metaTagContent(slice, "property", "og:image") ??
-    metaTagContent(slice, "name", "twitter:image");
-  const image = imgRaw ? toAbsoluteHref(resolvedPageUrl, imgRaw) ?? imgRaw : undefined;
+  const author = parseAuthor(slice, html);
+  const image = parseImage(slice, resolvedPageUrl);
 
   return {
     ...(title ? { title } : {}),

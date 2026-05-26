@@ -28,7 +28,8 @@ final class SavedLibraryTests: XCTestCase {
             preview: OpenGraphPreview(
                 title: "Story",
                 description: "Lead",
-                image: "https://news.example/og.png"
+                image: "https://news.example/og.png",
+                author: "Ada Lovelace"
             )
         )
 
@@ -39,6 +40,11 @@ final class SavedLibraryTests: XCTestCase {
         let item = try await library.savedItem(withKey: itemKey)
 
         XCTAssertEqual(external?.value.title, "Story")
+        XCTAssertEqual(external?.value.author, "Ada Lovelace")
+        XCTAssertEqual(item?.value.previewTitle, "Story")
+        XCTAssertEqual(item?.value.previewImage, "https://news.example/og.png")
+        XCTAssertEqual(item?.value.previewAuthor, "Ada Lovelace")
+        XCTAssertEqual(item?.value.linkedWebUrl, "https://news.example/story")
         XCTAssertEqual(item?.value.state, .unread)
         XCTAssertTrue(repository.hasRecord(collection: .savedItem, key: itemKey))
     }

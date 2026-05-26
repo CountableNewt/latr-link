@@ -29,6 +29,22 @@ export interface ResolvedPreview {
   canonicalUrl?: string;
   /** Hostname hint for favicon row chrome */
   siteLabel?: string;
+  /** Cached Open Graph author when available */
+  authorLabel?: string;
+}
+
+function previewSubtitle(excerpt?: string, author?: string): string | undefined {
+  const trimmedExcerpt = excerpt?.trim();
+  if (trimmedExcerpt) return trimmedExcerpt.slice(0, 200);
+
+  const trimmedAuthor = author?.trim();
+  if (trimmedAuthor) {
+    return trimmedAuthor.startsWith("@")
+      ? trimmedAuthor
+      : `By ${trimmedAuthor}`;
+  }
+
+  return undefined;
 }
 
 /** Prefer cached OG fields from `com.latr.saved.item` when the user saved from a web URL. */
@@ -42,7 +58,8 @@ export function mergeSavedItemOgPreview(
     !item.previewTitle?.trim() &&
     !item.previewImage?.trim() &&
     !item.previewExcerpt?.trim() &&
-    !item.previewSite?.trim()
+    !item.previewSite?.trim() &&
+    !item.previewAuthor?.trim()
   ) {
     return preview;
   }
@@ -61,16 +78,20 @@ export function mergeSavedItemOgPreview(
     }
   }
 
+  const authorLabel = item.previewAuthor?.trim() || preview.authorLabel;
+
   return {
     ...preview,
     title: item.previewTitle?.trim() || preview.title,
-    subtitle: item.previewExcerpt?.trim() || preview.subtitle,
+    subtitle:
+      previewSubtitle(item.previewExcerpt, item.previewAuthor) ||
+      preview.subtitle,
     imageHref: item.previewImage?.trim() || preview.imageHref,
     canonicalUrl:
       canonicalUrl === undefined ? preview.canonicalUrl : canonicalUrl,
     siteLabel,
-    href:
-      linked?.trim() || preview.href,
+    authorLabel,
+    href: linked?.trim() || preview.href,
   };
 }
 
@@ -131,11 +152,12 @@ export async function resolveSubjectPreview(
       return {
         kind: "external",
         title: previewTitleForExternal(ext),
-        subtitle: ext.excerpt?.slice(0, 200),
+        subtitle: previewSubtitle(ext.excerpt, ext.author),
         href: ext.normalizedUrl || ext.url,
         imageHref: ext.image?.trim(),
         canonicalUrl,
         siteLabel,
+        authorLabel: ext.author?.trim(),
       };
     }
     return {
