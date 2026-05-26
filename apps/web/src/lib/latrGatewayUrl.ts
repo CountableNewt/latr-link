@@ -1,37 +1,46 @@
+import {
+  configureLatrGateway,
+  DEFAULT_DEV_LATR_GATEWAY_URL,
+  DEFAULT_PROD_LATR_GATEWAY_URL,
+  DEFAULT_TESTING_LATR_GATEWAY_URL,
+  LOCAL_LATR_GATEWAY_URL,
+  latrGatewayBaseUrl as sharedLatrGatewayBaseUrl,
+} from "latr-web-client/latrGatewayConfig";
+
 import { getAppEnv } from "@/lib/environmentBanner";
 
-export const LOCAL_LATR_GATEWAY_URL = "http://127.0.0.1:8080";
-export const DEFAULT_TESTING_LATR_GATEWAY_URL = "https://api.testing.latr.link";
-export const DEFAULT_DEV_LATR_GATEWAY_URL =
-  "https://latr-link-dev-gateway.fly.dev";
-export const DEFAULT_PROD_LATR_GATEWAY_URL =
-  "https://latr-link-prod-gateway.fly.dev";
+export {
+  LOCAL_LATR_GATEWAY_URL,
+  DEFAULT_TESTING_LATR_GATEWAY_URL,
+  DEFAULT_DEV_LATR_GATEWAY_URL,
+  DEFAULT_PROD_LATR_GATEWAY_URL,
+};
+
+function syncWebGatewayConfig(): void {
+  let testingHostname: string | undefined;
+  if (typeof window !== "undefined") {
+    try {
+      testingHostname = new URL(window.location.href).hostname;
+    } catch {
+      //
+    }
+  }
+  configureLatrGateway({
+    gatewayUrl: process.env.NEXT_PUBLIC_LATR_GATEWAY_URL?.trim(),
+    appEnv: getAppEnv(),
+    testingHostname,
+    clientId: process.env.NEXT_PUBLIC_LATR_GATEWAY_CLIENT_ID?.trim(),
+    apiKey: process.env.NEXT_PUBLIC_LATR_GATEWAY_API_KEY?.trim(),
+  });
+}
 
 /**
  * Base URL for `services/latr-gateway` API calls.
  * Explicit `NEXT_PUBLIC_LATR_GATEWAY_URL` wins; otherwise resolved from app env.
  */
 export function latrGatewayBaseUrl(): string {
-  const configured = process.env.NEXT_PUBLIC_LATR_GATEWAY_URL?.trim();
-  if (configured) return configured.replace(/\/$/, "");
-
-  switch (getAppEnv()) {
-    case "prod":
-      return DEFAULT_PROD_LATR_GATEWAY_URL;
-    case "dev":
-      if (typeof window !== "undefined") {
-        try {
-          if (new URL(window.location.href).hostname === "testing.latr.link") {
-            return DEFAULT_TESTING_LATR_GATEWAY_URL;
-          }
-        } catch {
-          //
-        }
-      }
-      return DEFAULT_DEV_LATR_GATEWAY_URL;
-    default:
-      return LOCAL_LATR_GATEWAY_URL;
-  }
+  syncWebGatewayConfig();
+  return sharedLatrGatewayBaseUrl();
 }
 
 function testingGatewayUrl(): string {

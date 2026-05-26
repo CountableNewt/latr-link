@@ -10,5 +10,5 @@ SWIFT_WARNING_FLAGS=(-Xswiftc -warnings-as-errors)
 bun install --frozen-lockfile
 swift test "${SWIFT_WARNING_FLAGS[@]}" --package-path services/latr-gateway
 swift build -c release "${SWIFT_WARNING_FLAGS[@]}" --package-path services/latr-gateway
-bun run turbo run typecheck lint test build --filter=web...
+bun run turbo run typecheck lint test build --filter=web... --filter=extension...
 bun --cwd packages/lexicons test

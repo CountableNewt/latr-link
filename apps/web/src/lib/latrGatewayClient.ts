@@ -1,86 +1,49 @@
-import type { OAuthSession } from "@atproto/oauth-client-browser";
+import { configureLatrGateway } from "latr-web-client/latrGatewayConfig";
 import {
-  createSaveUpstreamDpopProofPool,
-  createUpstreamDpopProof,
-  LATR_API_KEY_HEADER,
-  LATR_CLIENT_ID_HEADER,
-  LATR_UPSTREAM_DPOP_HEADER,
-  pdsXrpcMethodForGatewayRequest,
-} from "latr-packages/gateway-client";
-import { latrGatewayBaseUrl } from "@/lib/latrGatewayUrl";
+  latrGatewayFetch as sharedLatrGatewayFetch,
+  latrGatewayJson as sharedLatrGatewayJson,
+} from "latr-web-client/latrGatewayClient";
+
+import { getAppEnv } from "@/lib/environmentBanner";
 
 export {
   LATR_API_KEY_HEADER,
   LATR_CLIENT_ID_HEADER,
   LATR_UPSTREAM_DPOP_HEADER,
-};
+} from "latr-web-client/latrGatewayClient";
 
 export { latrGatewayBaseUrl } from "@/lib/latrGatewayUrl";
 
-export async function latrGatewayFetch(
-  oauthSession: OAuthSession,
-  path: string,
-  init?: RequestInit
-): Promise<Response> {
-  const gatewayPath = path.startsWith("/") ? path : `/${path}`;
-  const url = `${latrGatewayBaseUrl()}${gatewayPath}`;
-  const method = init?.method ?? "GET";
-  const clientId = process.env.NEXT_PUBLIC_LATR_GATEWAY_CLIENT_ID?.trim();
-  const apiKey = process.env.NEXT_PUBLIC_LATR_GATEWAY_API_KEY?.trim();
-  const clientHeaders: Record<string, string> = {};
-  if (clientId && apiKey) {
-    clientHeaders[LATR_CLIENT_ID_HEADER] = clientId;
-    clientHeaders[LATR_API_KEY_HEADER] = apiKey;
+function syncWebGatewayConfig(): void {
+  let testingHostname: string | undefined;
+  if (typeof window !== "undefined") {
+    try {
+      testingHostname = new URL(window.location.href).hostname;
+    } catch {
+      //
+    }
   }
-
-  const upstream = pdsXrpcMethodForGatewayRequest(method, gatewayPath);
-  const upstreamHeaders: Record<string, string> = {};
-  const sessionWithTokenSet = oauthSession as OAuthSession & {
-    getTokenSet(refresh: boolean | "auto"): Promise<{ access_token: string }>;
-  };
-  const tokenSet = await sessionWithTokenSet.getTokenSet("auto");
-  const proofOptions = { accessToken: tokenSet.access_token };
-
-  if (method === "POST" && gatewayPath === "/v1/latr/saves") {
-    upstreamHeaders[LATR_UPSTREAM_DPOP_HEADER] =
-      await createSaveUpstreamDpopProofPool(oauthSession, proofOptions);
-  } else if (upstream) {
-    upstreamHeaders[LATR_UPSTREAM_DPOP_HEADER] = await createUpstreamDpopProof(
-      oauthSession,
-      upstream.xrpcMethod,
-      upstream.httpMethod,
-      proofOptions
-    );
-  }
-
-  return oauthSession.fetchHandler(url, {
-    ...init,
-    headers: {
-      Accept: "application/json",
-      ...clientHeaders,
-      ...upstreamHeaders,
-      ...(init?.headers ?? {}),
-    },
+  configureLatrGateway({
+    gatewayUrl: process.env.NEXT_PUBLIC_LATR_GATEWAY_URL?.trim(),
+    appEnv: getAppEnv(),
+    testingHostname,
+    clientId: process.env.NEXT_PUBLIC_LATR_GATEWAY_CLIENT_ID?.trim(),
+    apiKey: process.env.NEXT_PUBLIC_LATR_GATEWAY_API_KEY?.trim(),
   });
 }
 
-async function readGatewayError(res: Response): Promise<string> {
-  try {
-    const body = (await res.json()) as { message?: string; error?: string };
-    return body.message ?? body.error ?? `Gateway error (${res.status})`;
-  } catch {
-    return `Gateway error (${res.status})`;
-  }
+syncWebGatewayConfig();
+
+export async function latrGatewayFetch(
+  ...args: Parameters<typeof sharedLatrGatewayFetch>
+): Promise<Response> {
+  syncWebGatewayConfig();
+  return sharedLatrGatewayFetch(...args);
 }
 
 export async function latrGatewayJson<T>(
-  oauthSession: OAuthSession,
-  path: string,
-  init?: RequestInit
+  ...args: Parameters<typeof sharedLatrGatewayJson>
 ): Promise<T> {
-  const res = await latrGatewayFetch(oauthSession, path, init);
-  if (!res.ok) {
-    throw new Error(await readGatewayError(res));
-  }
-  return (await res.json()) as T;
+  syncWebGatewayConfig();
+  return sharedLatrGatewayJson<T>(...args);
 }
