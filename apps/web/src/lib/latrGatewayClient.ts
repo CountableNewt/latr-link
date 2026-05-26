@@ -35,14 +35,21 @@ export async function latrGatewayFetch(
 
   const upstream = pdsXrpcMethodForGatewayRequest(method, gatewayPath);
   const upstreamHeaders: Record<string, string> = {};
+  const sessionWithTokenSet = oauthSession as OAuthSession & {
+    getTokenSet(refresh: boolean | "auto"): Promise<{ access_token: string }>;
+  };
+  const tokenSet = await sessionWithTokenSet.getTokenSet("auto");
+  const proofOptions = { accessToken: tokenSet.access_token };
+
   if (method === "POST" && gatewayPath === "/v1/latr/saves") {
     upstreamHeaders[LATR_UPSTREAM_DPOP_HEADER] =
-      await createSaveUpstreamDpopProofPool(oauthSession);
+      await createSaveUpstreamDpopProofPool(oauthSession, proofOptions);
   } else if (upstream) {
     upstreamHeaders[LATR_UPSTREAM_DPOP_HEADER] = await createUpstreamDpopProof(
       oauthSession,
       upstream.xrpcMethod,
-      upstream.httpMethod
+      upstream.httpMethod,
+      proofOptions
     );
   }
 

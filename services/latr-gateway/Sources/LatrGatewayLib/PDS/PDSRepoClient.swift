@@ -54,16 +54,38 @@ public struct PDSRepositoryClient: RepositoryClient, Sendable {
         return message.localizedCaseInsensitiveContains("could not locate record")
     }
 
+    private func pdsFailureMessage(
+        method: String,
+        statusCode: Int,
+        json: [String: Any],
+        usedUpstreamProof: Bool
+    ) -> String {
+        var parts = ["PDS \(method) failed (\(statusCode))"]
+        if let error = json["error"] as? String, !error.isEmpty {
+            parts.append(error)
+        }
+        if let message = json["message"] as? String, !message.isEmpty {
+            parts.append(message)
+        }
+        if !usedUpstreamProof {
+            parts.append("missing upstream DPoP proof for this XRPC call")
+        }
+        return parts.joined(separator: ": ")
+    }
+
     private func xrpcPost(method: String, body: [String: Any]) async throws -> [String: Any] {
         let requestURL: String
         let dpopProof: String
+        let usedUpstreamProof: Bool
         if let consumed = upstreamPool.consume(forXrpcMethod: method, httpMethod: "POST") {
             requestURL = consumed.url
             dpopProof = consumed.proof
+            usedUpstreamProof = true
         } else {
             let base = try await pdsBase()
             requestURL = "\(base)/xrpc/\(method)"
             dpopProof = auth.dpopProof
+            usedUpstreamProof = false
         }
 
         guard URL(string: requestURL) != nil else {
@@ -90,19 +112,34 @@ public struct PDSRepositoryClient: RepositoryClient, Sendable {
             case 401:
                 throw GatewayError(
                     status: .unauthorized,
-                    message: "PDS rejected OAuth credentials for \(method)",
+                    message: pdsFailureMessage(
+                        method: method,
+                        statusCode: Int(response.status.code),
+                        json: jsonObject,
+                        usedUpstreamProof: usedUpstreamProof
+                    ),
                     code: "pds_unauthorized"
                 )
             case 403:
                 throw GatewayError(
                     status: .forbidden,
-                    message: "PDS rejected repo scope for \(method)",
+                    message: pdsFailureMessage(
+                        method: method,
+                        statusCode: Int(response.status.code),
+                        json: jsonObject,
+                        usedUpstreamProof: usedUpstreamProof
+                    ),
                     code: "pds_forbidden"
                 )
             default:
                 throw GatewayError(
                     status: .badGateway,
-                    message: "PDS \(method) failed (\(response.status.code))",
+                    message: pdsFailureMessage(
+                        method: method,
+                        statusCode: Int(response.status.code),
+                        json: jsonObject,
+                        usedUpstreamProof: usedUpstreamProof
+                    ),
                     code: "pds_error"
                 )
             }
