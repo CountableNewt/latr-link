@@ -17,11 +17,7 @@ public func tryCanonicalAtURI(_ trimmedInput: String) -> String? {
 }
 
 private func decodeMinimalHref(_ string: String) -> String {
-    string
-        .trimmingCharacters(in: .whitespacesAndNewlines)
-        .replacingOccurrences(of: "&quot;", with: "\"", options: .caseInsensitive)
-        .replacingOccurrences(of: "&#39;", with: "'")
-        .replacingOccurrences(of: "&amp;", with: "&", options: .caseInsensitive)
+    HtmlTextDecoder.decode(string.trimmingCharacters(in: .whitespacesAndNewlines))
 }
 
 private func sliceForEarlyHeadMarkup(_ html: String) -> String {

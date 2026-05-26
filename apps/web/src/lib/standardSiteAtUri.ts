@@ -3,13 +3,10 @@
  * {@link https://standard.site/#verification}.
  */
 import { tryCanonicalAtUri } from "@/lib/canonicalAtUri";
+import { decodeHtmlText } from "@/lib/decodeHtmlText";
 
 function decodeMinimalHref(s: string): string {
-  return s
-    .trim()
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&amp;/gi, "&");
+  return decodeHtmlText(s.trim());
 }
 
 function sliceForEarlyHeadMarkup(html: string): string {

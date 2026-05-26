@@ -44,12 +44,7 @@ private func stripWhitespace(_ string: String) -> String {
 }
 
 private func decodeMinimalEntities(_ string: String) -> String {
-    string
-        .replacingOccurrences(of: "&quot;", with: "\"", options: .caseInsensitive)
-        .replacingOccurrences(of: "&#39;", with: "'")
-        .replacingOccurrences(of: "&gt;", with: ">", options: .caseInsensitive)
-        .replacingOccurrences(of: "&lt;", with: "<", options: .caseInsensitive)
-        .replacingOccurrences(of: "&amp;", with: "&", options: .caseInsensitive)
+    HtmlTextDecoder.decode(string)
 }
 
 private func normalizeMetaValue(_ string: String) -> String? {

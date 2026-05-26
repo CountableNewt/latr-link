@@ -1,3 +1,5 @@
+import { decodeHtmlText } from "@/lib/decodeHtmlText";
+
 /** Parsed Open Graph / Twitter Card fields for embedding saved links (issue #2). */
 
 export interface OpenGraphFields {
@@ -28,12 +30,7 @@ function stripWhitespace(s: string): string {
 }
 
 function decodeMinimalEntities(s: string): string {
-  return s
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&gt;/gi, ">")
-    .replace(/&lt;/gi, "<")
-    .replace(/&amp;/gi, "&");
+  return decodeHtmlText(s);
 }
 
 function normalizeMetaValue(s: string): string | undefined {

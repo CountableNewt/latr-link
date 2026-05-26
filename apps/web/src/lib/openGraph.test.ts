@@ -55,4 +55,16 @@ describe("parseOpenGraphMarkup", () => {
       author: "Ada",
     });
   });
+
+  test("decodes apostrophe entities in metadata", () => {
+    const html = `<head>
+      <meta property="og:title" content="Tom&amp;#39;s Guide"/>
+      <meta property="og:description" content="It&apos;s \\u0027great\\u0027"/>
+    </head>`;
+
+    expect(parseOpenGraphMarkup(html, "https://news.example/item")).toEqual({
+      title: "Tom's Guide",
+      description: "It's 'great'",
+    });
+  });
 });
