@@ -29,11 +29,11 @@ Credentials come from either:
 - **Official env** — `LATR_GATEWAY_OFFICIAL_CLIENT_CREDENTIALS=latr-link-web:<base64>,the-social-wire-web:<base64>` (same pattern as shared secrets between Social Wire gateway and AppView)
 - **Client registration API** — persisted to `LATR_GATEWAY_CLIENT_REGISTRY_PATH` (returns a new base64 credential once)
 
-Generate a credential: `openssl rand -base64 32`. Set the same value on the gateway (in the `client-id=` pair) and on the client (`NEXT_PUBLIC_LATR_GATEWAY_CLIENT_CREDENTIAL` or `VITE_LATR_GATEWAY_CLIENT_CREDENTIAL`).
+Generate a credential: `openssl rand -base64 32`. Set the same value on the gateway (in the `client-id=` pair) and on the client (`LATR_GATEWAY_CLIENT_CREDENTIAL` on L@tr web or `VITE_LATR_GATEWAY_CLIENT_CREDENTIAL` on the extension).
 
-**L@tr web** — set `NEXT_PUBLIC_LATR_GATEWAY_CLIENT_CREDENTIAL` when calling a hosted gateway that enforces credentials. This ships in the browser bundle; use the `latr-link-web` credential with rate limits.
+**L@tr web** — set `LATR_GATEWAY_CLIENT_CREDENTIAL` when calling a hosted gateway that enforces credentials. It is not `NEXT_PUBLIC_*`; `apps/web/next.config.ts` inlines it at build time (still present in the browser bundle). Use the `latr-link-web` credential with rate limits.
 
-**The Social Wire** — set the `the-social-wire-web` credential in gateway env and `NEXT_PUBLIC_LATR_GATEWAY_CLIENT_CREDENTIAL` on web (or register via API for a one-off credential).
+**The Social Wire** — set the `the-social-wire-web` credential in gateway env and the web/iOS client credential env (or register via API for a one-off credential).
 
 Local development (`APP_ENV=local`) skips client credentials by default.
 
@@ -126,7 +126,7 @@ Full template: `services/latr-gateway/.env.example`.
 | Variable | Description |
 |----------|-------------|
 | `NEXT_PUBLIC_LATR_GATEWAY_URL` | Gateway base URL (default `http://127.0.0.1:8080`) |
-| `NEXT_PUBLIC_LATR_GATEWAY_CLIENT_CREDENTIAL` | Base64 official credential for `latr-link-web` when hosted gateway requires it |
+| `LATR_GATEWAY_CLIENT_CREDENTIAL` | Base64 official credential for `latr-link-web` (build-time via `next.config.ts`; not `NEXT_PUBLIC_*`) |
 
 ## Local development
 

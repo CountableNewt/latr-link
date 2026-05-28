@@ -128,6 +128,6 @@ export function assertLatrGatewayClientCredential(
   const base = latrGatewayBaseUrl(config);
   if (isLoopbackGatewayUrl(base)) return;
   throw new Error(
-    `Hosted L@tr gateway requires an official client credential. Set NEXT_PUBLIC_LATR_GATEWAY_CLIENT_CREDENTIAL (web) or VITE_LATR_GATEWAY_CLIENT_CREDENTIAL (extension) to the same base64 value as ${LATR_LINK_WEB_CLIENT_ID} in gateway LATR_GATEWAY_OFFICIAL_CLIENT_CREDENTIALS, then redeploy.`
+    `Hosted L@tr gateway requires an official client credential. Set LATR_GATEWAY_CLIENT_CREDENTIAL (web; build-time via next.config) or VITE_LATR_GATEWAY_CLIENT_CREDENTIAL (extension) to the same base64 value as ${LATR_LINK_WEB_CLIENT_ID} in gateway LATR_GATEWAY_OFFICIAL_CLIENT_CREDENTIALS, then redeploy.`
   );
 }

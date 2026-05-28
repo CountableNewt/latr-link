@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_APP_ENV:
       process.env.NEXT_PUBLIC_APP_ENV ?? process.env.APP_ENV ?? "",
+    /** Inlined at build from Vercel/local env (not NEXT_PUBLIC_*); still ships in the client bundle. */
+    LATR_GATEWAY_CLIENT_CREDENTIAL:
+      process.env.LATR_GATEWAY_CLIENT_CREDENTIAL ?? "",
   },
   allowedDevOrigins: ["127.0.0.1"],
   async rewrites() {

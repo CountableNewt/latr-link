@@ -26,7 +26,7 @@ export function syncLatrGatewayFromBrowser(): void {
       //
     }
   }
-  const credential = process.env.NEXT_PUBLIC_LATR_GATEWAY_CLIENT_CREDENTIAL?.trim();
+  const credential = process.env.LATR_GATEWAY_CLIENT_CREDENTIAL?.trim();
   configureLatrGateway({
     gatewayUrl: process.env.NEXT_PUBLIC_LATR_GATEWAY_URL?.trim(),
     appEnv: toLatrGatewayAppEnv(),
