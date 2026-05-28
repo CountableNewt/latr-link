@@ -15,8 +15,6 @@ export {
 
 export { latrGatewayBaseUrl };
 
-syncLatrGatewayFromBrowser();
-
 export async function latrGatewayFetch(
   ...args: Parameters<typeof sharedLatrGatewayFetch>
 ): Promise<Response> {

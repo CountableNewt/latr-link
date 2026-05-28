@@ -16,6 +16,22 @@ export {
   DEFAULT_PROD_LATR_GATEWAY_URL,
 };
 
+/** Credential from the server layout (runtime env); wins over client `process.env`. */
+let injectedGatewayClientCredential: string | undefined;
+
+export function setInjectedGatewayClientCredential(
+  credential: string | undefined
+): void {
+  const trimmed = credential?.trim();
+  injectedGatewayClientCredential = trimmed || undefined;
+}
+
+/** Read gateway client credential on the server (layout) or from build-time env. */
+export function readGatewayClientCredentialFromEnv(): string | undefined {
+  const fromEnv = process.env.LATR_GATEWAY_CLIENT_CREDENTIAL?.trim();
+  return fromEnv || undefined;
+}
+
 /** Push web env + current browser hostname into shared `latr-web-client` config. */
 export function syncLatrGatewayFromBrowser(): void {
   let testingHostname: string | undefined;
@@ -26,7 +42,8 @@ export function syncLatrGatewayFromBrowser(): void {
       //
     }
   }
-  const credential = process.env.LATR_GATEWAY_CLIENT_CREDENTIAL?.trim();
+  const credential =
+    injectedGatewayClientCredential ?? readGatewayClientCredentialFromEnv();
   configureLatrGateway({
     gatewayUrl: process.env.NEXT_PUBLIC_LATR_GATEWAY_URL?.trim(),
     appEnv: toLatrGatewayAppEnv(),

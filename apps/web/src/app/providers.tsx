@@ -8,7 +8,10 @@ import {
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { AuthProvider } from "@/hooks/useAuth";
-import { syncLatrGatewayFromBrowser } from "@/lib/latrGatewayUrl";
+import {
+  setInjectedGatewayClientCredential,
+  syncLatrGatewayFromBrowser,
+} from "@/lib/latrGatewayUrl";
 
 const QUERY_PERSIST_KEY = "latr.link.react-query.v1";
 const QUERY_PERSIST_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7;
@@ -18,10 +21,21 @@ function shouldDehydrateQuery(query: Query): boolean {
   return Array.isArray(key) && key[0] === "saved-library";
 }
 
-export function Providers({ children }: { children: React.ReactNode }) {
+export function Providers({
+  children,
+  gatewayClientCredential,
+}: {
+  children: React.ReactNode;
+  /** From server layout (`process.env.LATR_GATEWAY_CLIENT_CREDENTIAL` at request time). */
+  gatewayClientCredential?: string;
+}) {
+  setInjectedGatewayClientCredential(gatewayClientCredential);
+  syncLatrGatewayFromBrowser();
+
   useLayoutEffect(() => {
+    setInjectedGatewayClientCredential(gatewayClientCredential);
     syncLatrGatewayFromBrowser();
-  }, []);
+  }, [gatewayClientCredential]);
 
   const [queryClient] = useState(
     () =>
