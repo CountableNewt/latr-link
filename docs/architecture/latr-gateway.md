@@ -16,14 +16,14 @@ Server-side L@tr API (Swift/Hummingbird). Clients authenticate in two layers:
 
 ### Developer API keys (preferred)
 
-Third-party and console-issued clients send:
+Third-party and [latrkit.dev](https://github.com/Stygian-Tech/latrkit-dev)-issued clients send:
 
 | Header | Description |
 |--------|-------------|
 | `X-Latr-Client-Id` | Registered client id (`^[a-z][a-z0-9-]{0,62}$`) |
 | `X-Latr-API-Key` | Opaque key (`lk_…`), shown once at creation |
 
-Keys are hashed at rest (SHA-256). Issue and rotate keys via **latrkit.dev** or the developer management API (OAuth-protected).
+Keys are hashed at rest (SHA-256). Issue and rotate keys via **[latrkit.dev](https://github.com/Stygian-Tech/latrkit-dev)** or the developer management API (OAuth-protected).
 
 When `LATR_GATEWAY_REQUIRE_CLIENT_API_KEY=true` (default in `APP_ENV=prod`), these headers (or legacy official header below) are required on every `/v1/latr/*` route except developer management routes.
 
@@ -35,7 +35,7 @@ Legacy first-party apps may still use:
 |--------|-------------|
 | `X-Latr-Official-Client` | Base64 credential from env map `LATR_GATEWAY_OFFICIAL_CLIENT_CREDENTIALS` |
 
-Provision new official clients through **latrkit.dev** when `OFFICIAL_CLIENT_DID` matches the signed-in operator DID (`POST /v1/latr/developer/official/clients`). Do not document public base64 self-registration.
+Provision new official clients through **[latrkit.dev](https://github.com/Stygian-Tech/latrkit-dev)** when `OFFICIAL_CLIENT_DID` matches the signed-in operator DID (`POST /v1/latr/developer/official/clients`). Do not document public base64 self-registration.
 
 Local development (`APP_ENV=local`) skips client credentials by default.
 
@@ -112,8 +112,8 @@ Full template: [`services/latr-gateway/.env.example`](../../services/latr-gatewa
 # Terminal 1 — gateway
 cd services/latr-gateway && swift run LatrGateway
 
-# Terminal 2 — latrkit.dev console
-cd apps/latrkit-dev && bun run dev
+# Terminal 2 — latrkit.dev console (sibling repo)
+cd ../latrkit-dev && bun run dev
 
 # Terminal 3 — L@tr.link web
 cd apps/web && bun run dev
