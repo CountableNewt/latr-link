@@ -164,11 +164,13 @@ private func assertDPOPStructure(_ proof: String) throws {
 public func authenticateRequest(
     _ request: Request,
     config: GatewayConfig,
-    registry: ClientRegistry
+    store: any DeveloperStore,
+    requireClientAPIKey override: Bool? = nil
 ) async throws -> AuthContext {
-    let clientID = try await registry.resolveClientID(
+    let requireClientAPIKey = override ?? config.requireClientAPIKey
+    let clientID = try await store.resolveClientID(
         from: request.headers,
-        requireClientAPIKey: config.requireClientAPIKey
+        requireClientAPIKey: requireClientAPIKey
     )
 
     guard let authorization = request.headers[.authorization]?

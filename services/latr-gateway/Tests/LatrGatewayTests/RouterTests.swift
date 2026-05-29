@@ -70,34 +70,17 @@ final class RouterTests: XCTestCase {
 
         try await app.test(.router) { client in
             try await client.execute(uri: "/v1/latr/saves", method: .get) { response in
-                XCTAssertEqual(response.status, .unauthorized)
+                XCTAssertEqual(response.status, .forbidden)
             }
         }
         try await httpClient.shutdown()
     }
 
-    func testRegisterClientReturnsAPIKey() async throws {
-        let config = GatewayConfig(
-            port: 8080,
-            appEnv: .local,
-            plcURL: "https://plc.directory",
-            oauthRequireKnownClient: false,
-            oauthAllowedClientIDs: [],
-            clientRegistryURL: registryURL()
-        )
-        let (app, httpClient) = makeApp(config: config)
-
+    func testDeveloperClientsRequireOAuth() async throws {
+        let (app, httpClient) = makeApp()
         try await app.test(.router) { client in
-            try await client.execute(
-                uri: "/v1/latr/clients/register",
-                method: .post,
-                headers: [.contentType: "application/json"],
-                body: ByteBuffer(string: #"{"clientId":"the-social-wire-web","displayName":"The Social Wire"}"#)
-            ) { response in
-                XCTAssertEqual(response.status, .created)
-                let body = String(buffer: response.body)
-                XCTAssertTrue(body.contains("\"clientId\":\"the-social-wire-web\""))
-                XCTAssertTrue(body.contains("\"clientCredential\":\""))
+            try await client.execute(uri: "/v1/latr/developer/clients", method: .get) { response in
+                XCTAssertEqual(response.status, .unauthorized)
             }
         }
         try await httpClient.shutdown()

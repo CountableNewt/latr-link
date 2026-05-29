@@ -1,3 +1,11 @@
+import {
+  buildDeveloperGatewayHeaders,
+  LATR_API_KEY_HEADER,
+  LATR_CLIENT_ID_HEADER,
+} from "latr-packages/gateway-client";
+
+export { LATR_API_KEY_HEADER, LATR_CLIENT_ID_HEADER };
+
 /** Official gateway client id for L@tr.link web (env key in `LATR_GATEWAY_OFFICIAL_CLIENT_CREDENTIALS`). */
 export const LATR_LINK_WEB_CLIENT_ID = "latr-link-web";
 
@@ -19,8 +27,11 @@ export type LatrGatewayEnvConfig = {
   appEnv?: LatrAppEnv;
   /** When app env is dev, use testing gateway for this hostname. */
   testingHostname?: string;
-  /** Base64 official client credential (from env; ships in browser/extension bundles). */
+  /** Base64 official client credential (internal first-party; legacy header). */
   clientCredential?: string;
+  /** Split developer API key auth (preferred for third-party and console-issued keys). */
+  clientId?: string;
+  apiKey?: string;
 };
 
 let globalGatewayConfig: LatrGatewayEnvConfig = {
@@ -38,6 +49,8 @@ export function configureLatrGateway(config: LatrGatewayEnvConfig): void {
   if (config.clientCredential !== undefined) {
     next.clientCredential = config.clientCredential;
   }
+  if (config.clientId !== undefined) next.clientId = config.clientId;
+  if (config.apiKey !== undefined) next.apiKey = config.apiKey;
   globalGatewayConfig = next;
 }
 
@@ -113,6 +126,12 @@ export const LATR_OFFICIAL_CLIENT_HEADER = "X-Latr-Official-Client";
 export function latrGatewayClientHeaders(
   config: LatrGatewayEnvConfig = globalGatewayConfig
 ): Record<string, string> {
+  const clientId = config.clientId?.trim();
+  const apiKey = config.apiKey?.trim();
+  if (clientId && apiKey) {
+    return buildDeveloperGatewayHeaders({ clientId, apiKey });
+  }
+
   const credential = config.clientCredential?.trim();
   if (!credential) return {};
   return {
@@ -124,10 +143,12 @@ export function latrGatewayClientHeaders(
 export function assertLatrGatewayClientCredential(
   config: LatrGatewayEnvConfig = globalGatewayConfig
 ): void {
-  if (latrGatewayClientHeaders(config)[LATR_OFFICIAL_CLIENT_HEADER]) return;
+  const headers = latrGatewayClientHeaders(config);
+  if (headers[LATR_CLIENT_ID_HEADER] && headers[LATR_API_KEY_HEADER]) return;
+  if (headers[LATR_OFFICIAL_CLIENT_HEADER]) return;
   const base = latrGatewayBaseUrl(config);
   if (isLoopbackGatewayUrl(base)) return;
   throw new Error(
-    `Hosted L@tr gateway requires an official client credential. Set LATR_GATEWAY_CLIENT_CREDENTIAL (web; build-time via next.config) or VITE_LATR_GATEWAY_CLIENT_CREDENTIAL (extension) to the same base64 value as ${LATR_LINK_WEB_CLIENT_ID} in gateway LATR_GATEWAY_OFFICIAL_CLIENT_CREDENTIALS, then redeploy.`
+    `Hosted L@tr gateway requires client credentials. Set LATR_GATEWAY_CLIENT_ID + LATR_GATEWAY_API_KEY (split headers) or LATR_GATEWAY_CLIENT_CREDENTIAL / VITE_LATR_GATEWAY_CLIENT_CREDENTIAL (legacy official header), then redeploy.`
   );
 }

@@ -44,11 +44,14 @@ export function syncLatrGatewayFromBrowser(): void {
   }
   const credential =
     injectedGatewayClientCredential ?? readGatewayClientCredentialFromEnv();
+  const clientId = process.env.LATR_GATEWAY_CLIENT_ID?.trim();
+  const apiKey = process.env.LATR_GATEWAY_API_KEY?.trim();
   configureLatrGateway({
     gatewayUrl: process.env.NEXT_PUBLIC_LATR_GATEWAY_URL?.trim(),
     appEnv: toLatrGatewayAppEnv(),
     testingHostname,
     ...(credential ? { clientCredential: credential } : {}),
+    ...(clientId && apiKey ? { clientId, apiKey } : {}),
   });
 }
 

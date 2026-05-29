@@ -6,6 +6,8 @@ import {
   DEFAULT_DEV_LATR_GATEWAY_URL,
   DEFAULT_PROD_LATR_GATEWAY_URL,
   DEFAULT_TESTING_LATR_GATEWAY_URL,
+  LATR_API_KEY_HEADER,
+  LATR_CLIENT_ID_HEADER,
   LATR_OFFICIAL_CLIENT_HEADER,
   LOCAL_LATR_GATEWAY_URL,
   latrGatewayBaseUrl,
@@ -16,6 +18,8 @@ afterEach(() => {
   configureLatrGateway({
     appEnv: "local",
     clientCredential: "",
+    clientId: "",
+    apiKey: "",
     testingHostname: "",
   });
 });
@@ -76,12 +80,22 @@ describe("latrGatewayBaseUrl", () => {
     );
   });
 
+  test("sends split developer headers when client id and api key are configured", () => {
+    configureLatrGateway({
+      clientId: "the-social-wire-web",
+      apiKey: "lk_test_key",
+    });
+    const headers = latrGatewayClientHeaders();
+    expect(headers[LATR_CLIENT_ID_HEADER]).toBe("the-social-wire-web");
+    expect(headers[LATR_API_KEY_HEADER]).toBe("lk_test_key");
+  });
+
   test("assertLatrGatewayClientCredential throws for hosted gateway without credential", () => {
     configureLatrGateway({
       appEnv: "dev",
       testingHostname: "testing.latr.link",
     });
-    expect(() => assertLatrGatewayClientCredential()).toThrow(/official client credential/i);
+    expect(() => assertLatrGatewayClientCredential()).toThrow(/client credentials/i);
   });
 
   test("assertLatrGatewayClientCredential allows loopback without credential", () => {

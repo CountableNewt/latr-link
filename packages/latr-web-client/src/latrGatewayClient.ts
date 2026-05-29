@@ -16,14 +16,22 @@ import {
 
 export { LATR_OFFICIAL_CLIENT_HEADER, LATR_UPSTREAM_DPOP_HEADER };
 
+export type LatrGatewayFetchOptions = {
+  /** Developer console management routes use OAuth only (no app API key). */
+  skipClientCredential?: boolean;
+};
+
 export async function latrGatewayFetch(
   oauthSession: OAuthSession,
   path: string,
-  init?: RequestInit
+  init?: RequestInit,
+  options?: LatrGatewayFetchOptions
 ): Promise<Response> {
   const gatewayPath = path.startsWith("/") ? path : `/${path}`;
   const config = getLatrGatewayConfig();
-  assertLatrGatewayClientCredential(config);
+  if (!options?.skipClientCredential) {
+    assertLatrGatewayClientCredential(config);
+  }
   const url = `${latrGatewayBaseUrl(config)}${gatewayPath}`;
   const method = init?.method ?? "GET";
   const clientHeaders = latrGatewayClientHeaders(config);
@@ -71,9 +79,10 @@ async function readGatewayError(res: Response): Promise<string> {
 export async function latrGatewayJson<T>(
   oauthSession: OAuthSession,
   path: string,
-  init?: RequestInit
+  init?: RequestInit,
+  options?: LatrGatewayFetchOptions
 ): Promise<T> {
-  const res = await latrGatewayFetch(oauthSession, path, init);
+  const res = await latrGatewayFetch(oauthSession, path, init, options);
   if (!res.ok) {
     throw new Error(await readGatewayError(res));
   }

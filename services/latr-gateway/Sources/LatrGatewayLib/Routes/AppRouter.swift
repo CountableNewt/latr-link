@@ -6,22 +6,19 @@ import LatrKit
 public struct GatewayServices: Sendable {
     public let config: GatewayConfig
     public let httpClient: HTTPClient
-    public let clientRegistry: ClientRegistry
+    public let developerStore: any DeveloperStore
 
-    public init(config: GatewayConfig, httpClient: HTTPClient, clientRegistry: ClientRegistry) {
+    public init(config: GatewayConfig, httpClient: HTTPClient, developerStore: any DeveloperStore) {
         self.config = config
         self.httpClient = httpClient
-        self.clientRegistry = clientRegistry
+        self.developerStore = developerStore
     }
 
     public static func make(config: GatewayConfig, httpClient: HTTPClient) -> GatewayServices {
         GatewayServices(
             config: config,
             httpClient: httpClient,
-            clientRegistry: ClientRegistry(
-                officialClients: config.officialClientCredentials,
-                registryURL: config.clientRegistryURL
-            )
+            developerStore: DeveloperStoreFactory.make(config: config)
         )
     }
 
@@ -113,46 +110,7 @@ public func buildRouter(services: GatewayServices) -> Router<BasicRequestContext
 
     let latr = router.group("v1/latr")
 
-    latr.post("clients/register") { request, _ in
-        do {
-            try assertRegistrationAuthorized(request.headers, config: services.config)
-            let body = try await decodeJSONBody(request, as: RegisterClientBody.self)
-            let registered = try await services.clientRegistry.registerClient(
-                clientID: body.clientId,
-                displayName: body.displayName
-            )
-            return try jsonResponse(registered, status: .created)
-        } catch {
-            return errorResponse(error)
-        }
-    }
-
-    latr.get("clients") { request, _ in
-        do {
-            try assertRegistrationAuthorized(request.headers, config: services.config)
-            let clients = await services.clientRegistry.listClients()
-            return try jsonResponse(ListClientsResponse(clients: clients))
-        } catch {
-            return errorResponse(error)
-        }
-    }
-
-    latr.delete("clients/:clientId") { request, context in
-        do {
-            try assertRegistrationAuthorized(request.headers, config: services.config)
-            let clientId = (try? context.parameters.require("clientId"))
-                ?? request.uri.path.split(separator: "/").last.map(String.init)
-                ?? ""
-            let decoded = clientId.removingPercentEncoding ?? clientId
-            guard !decoded.isEmpty else {
-                throw GatewayError(status: .notFound, message: "Gateway client not found", code: "client_not_found")
-            }
-            _ = try await services.clientRegistry.revokeClient(clientID: decoded)
-            return try jsonResponse(SimpleOKResponse(ok: true))
-        } catch {
-            return errorResponse(error)
-        }
-    }
+    DeveloperRoutes.register(on: latr, services: services)
 
     latr.post("auth/probe") { request, _ in
         await handleProtected(request: request, services: services) { auth in
@@ -324,9 +282,19 @@ private func handleProtected(
         let auth = try await authenticateRequest(
             request,
             config: services.config,
-            registry: services.clientRegistry
+            store: services.developerStore
         )
-        return try await handler(auth)
+        if let clientID = auth.clientID {
+            try await services.developerStore.assertWithinDailyLimit(clientID: clientID)
+        }
+        let response = try await handler(auth)
+        if let clientID = auth.clientID, (200 ... 299).contains(response.status.code) {
+            try await services.developerStore.recordUsage(
+                clientID: clientID,
+                routeFamily: routeFamily(for: request.uri.path)
+            )
+        }
+        return response
     } catch {
         return errorResponse(error)
     }

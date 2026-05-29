@@ -19,6 +19,12 @@ public struct GatewayConfig: Sendable {
     public let clientRegistrationSecret: String?
     /// SPA origin for OAuth redirect_uris when metadata is served from the gateway.
     public let oauthPublicOrigin: String?
+    /// DID allowed to provision official gateway clients via the developer console.
+    public let officialClientDID: String?
+    /// Supabase/Postgres connection string (apply migrations separately).
+    public let databaseURL: String?
+    /// JSON persistence path for developer clients, keys, and usage counters.
+    public let developerStoreURL: URL
 
     public init(
         port: Int,
@@ -30,7 +36,10 @@ public struct GatewayConfig: Sendable {
         officialClientCredentials: [String: String] = [:],
         clientRegistryURL: URL = GatewayConfig.defaultClientRegistryURL(),
         clientRegistrationSecret: String? = nil,
-        oauthPublicOrigin: String? = nil
+        oauthPublicOrigin: String? = nil,
+        officialClientDID: String? = nil,
+        databaseURL: String? = nil,
+        developerStoreURL: URL = GatewayConfig.defaultDeveloperStoreURL()
     ) {
         self.port = port
         self.appEnv = appEnv
@@ -42,6 +51,18 @@ public struct GatewayConfig: Sendable {
         self.clientRegistryURL = clientRegistryURL
         self.clientRegistrationSecret = clientRegistrationSecret
         self.oauthPublicOrigin = oauthPublicOrigin
+        self.officialClientDID = officialClientDID
+        self.databaseURL = databaseURL
+        self.developerStoreURL = developerStoreURL
+    }
+
+    public static func defaultDeveloperStoreURL() -> URL {
+        let raw = ProcessInfo.processInfo.environment["LATR_GATEWAY_DEVELOPER_STORE_PATH"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if let raw, !raw.isEmpty {
+            return URL(fileURLWithPath: raw)
+        }
+        return URL(fileURLWithPath: "data/developer-store.json", relativeTo: URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
     }
 
     public static func defaultClientRegistryURL() -> URL {
@@ -92,6 +113,11 @@ public struct GatewayConfig: Sendable {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let oauthPublicOrigin = env["OAUTH_PUBLIC_ORIGIN"]?
             .trimmingCharacters(in: .whitespacesAndNewlines)
+        let officialClientDID = env["OFFICIAL_CLIENT_DID"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let databaseURL = env["DATABASE_URL"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let developerStoreURL = resolvedDeveloperStoreURL(from: env)
 
         return GatewayConfig(
             port: port,
@@ -103,7 +129,10 @@ public struct GatewayConfig: Sendable {
             officialClientCredentials: officialClientCredentials,
             clientRegistryURL: clientRegistryURL,
             clientRegistrationSecret: registrationSecret?.isEmpty == false ? registrationSecret : nil,
-            oauthPublicOrigin: oauthPublicOrigin?.isEmpty == false ? oauthPublicOrigin : nil
+            oauthPublicOrigin: oauthPublicOrigin?.isEmpty == false ? oauthPublicOrigin : nil,
+            officialClientDID: officialClientDID?.isEmpty == false ? officialClientDID : nil,
+            databaseURL: databaseURL?.isEmpty == false ? databaseURL : nil,
+            developerStoreURL: developerStoreURL
         )
     }
 }
@@ -128,4 +157,13 @@ private func resolvedClientRegistryURL(from env: [String: String]) -> URL {
         return URL(fileURLWithPath: raw)
     }
     return GatewayConfig.defaultClientRegistryURL()
+}
+
+private func resolvedDeveloperStoreURL(from env: [String: String]) -> URL {
+    let raw = env["LATR_GATEWAY_DEVELOPER_STORE_PATH"]?
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    if let raw, !raw.isEmpty {
+        return URL(fileURLWithPath: raw)
+    }
+    return GatewayConfig.defaultDeveloperStoreURL()
 }
