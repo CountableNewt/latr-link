@@ -50,7 +50,7 @@ public enum LatrKitOAuthClientMetadata {
             token_endpoint_auth_method: "none",
             dpop_bound_access_tokens: true,
             client_name: "LatrKit Developer Console",
-            client_uri: redirectBase
+            client_uri: metadataBase
         )
         let enc = JSONEncoder()
         enc.outputFormatting = [.sortedKeys]
