@@ -1,6 +1,18 @@
-import { describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import type { OAuthSession } from "@atproto/oauth-client-browser";
-import { LatrRepo } from "./latrRepo";
+import { configureLatrGateway } from "latr-web-client/latrGatewayConfig";
+import { LatrRepo } from "latr-web-client/latrRepo";
+
+beforeEach(() => {
+  configureLatrGateway({
+    appEnv: "local",
+    gatewayUrl: "http://127.0.0.1:8080",
+    testingHostname: "127.0.0.1",
+    clientCredential: "",
+    clientId: "",
+    apiKey: "",
+  });
+});
 
 function mockOAuthSession(
   handler: (url: string, init?: RequestInit) => Promise<Response>
