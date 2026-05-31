@@ -45,8 +45,8 @@ public actor PersistentDeveloperStore: DeveloperStore {
         try persistSnapshot(snapshot)
     }
 
-    private func commit<T>(
-        _ operation: () async throws -> T
+    private func commit<T: Sendable>(
+        _ operation: @Sendable () async throws -> T
     ) async throws -> T {
         let before = await backing.snapshot()
         let result = try await operation()
