@@ -10,6 +10,7 @@ import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persist
 import { AuthProvider } from "@/hooks/useAuth";
 import {
   setInjectedGatewayClientCredential,
+  setInjectedGatewayClientCredentials,
   syncLatrGatewayFromBrowser,
 } from "@/lib/latrGatewayUrl";
 
@@ -24,18 +25,32 @@ function shouldDehydrateQuery(query: Query): boolean {
 export function Providers({
   children,
   gatewayClientCredential,
+  gatewayClientId,
+  gatewayApiKey,
 }: {
   children: React.ReactNode;
-  /** From server layout (`process.env.LATR_GATEWAY_CLIENT_CREDENTIAL` at request time). */
+  /** From server layout (`LATR_GATEWAY_CLIENT_CREDENTIAL` at request time). */
   gatewayClientCredential?: string;
+  /** From server layout (`LATR_GATEWAY_CLIENT_ID` at request time). */
+  gatewayClientId?: string;
+  /** From server layout (`LATR_GATEWAY_API_KEY` at request time). */
+  gatewayApiKey?: string;
 }) {
   setInjectedGatewayClientCredential(gatewayClientCredential);
+  setInjectedGatewayClientCredentials({
+    clientId: gatewayClientId,
+    apiKey: gatewayApiKey,
+  });
   syncLatrGatewayFromBrowser();
 
   useLayoutEffect(() => {
     setInjectedGatewayClientCredential(gatewayClientCredential);
+    setInjectedGatewayClientCredentials({
+      clientId: gatewayClientId,
+      apiKey: gatewayApiKey,
+    });
     syncLatrGatewayFromBrowser();
-  }, [gatewayClientCredential]);
+  }, [gatewayClientCredential, gatewayClientId, gatewayApiKey]);
 
   const [queryClient] = useState(
     () =>

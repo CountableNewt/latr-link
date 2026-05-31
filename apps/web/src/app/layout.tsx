@@ -10,7 +10,10 @@ import {
 } from "@/lib/environmentBanner";
 
 import "./globals.css";
-import { readGatewayClientCredentialFromEnv } from "@/lib/latrGatewayUrl";
+import {
+  readGatewayClientCredentialFromEnv,
+  readGatewayClientCredentialsFromEnv,
+} from "@/lib/latrGatewayUrl";
 import { Providers } from "./providers";
 
 const title = "L@tr.link";
@@ -58,6 +61,7 @@ export default function RootLayout({
 }>) {
   const appEnv = getAppEnv();
   const gatewayClientCredential = readGatewayClientCredentialFromEnv();
+  const gatewayClientCredentials = readGatewayClientCredentialsFromEnv();
   const bodyStyle = {
     "--env-banner-offset": environmentBannerOffset(appEnv),
   } as CSSProperties;
@@ -72,7 +76,11 @@ export default function RootLayout({
         <Script id="latr-loopback-host" strategy="beforeInteractive">
           {`if(location.protocol==="http:"&&(location.hostname==="localhost"||location.hostname==="[::1]")){location.replace("http://127.0.0.1"+(location.port?":"+location.port:"")+location.pathname+location.search+location.hash)}`}
         </Script>
-        <Providers gatewayClientCredential={gatewayClientCredential}>
+        <Providers
+          gatewayClientCredential={gatewayClientCredential}
+          gatewayClientId={gatewayClientCredentials.clientId}
+          gatewayApiKey={gatewayClientCredentials.apiKey}
+        >
           <EnvironmentBanner appEnv={appEnv} />
           {children}
         </Providers>

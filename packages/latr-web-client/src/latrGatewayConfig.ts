@@ -149,6 +149,6 @@ export function assertLatrGatewayClientCredential(
   const base = latrGatewayBaseUrl(config);
   if (isLoopbackGatewayUrl(base)) return;
   throw new Error(
-    `Hosted L@tr gateway requires client credentials. Set LATR_GATEWAY_CLIENT_ID + LATR_GATEWAY_API_KEY (split headers) or LATR_GATEWAY_CLIENT_CREDENTIAL / VITE_LATR_GATEWAY_CLIENT_CREDENTIAL (legacy official header), then redeploy.`
+    `Hosted L@tr gateway requires client credentials. Set LATR_GATEWAY_CLIENT_ID + LATR_GATEWAY_API_KEY (split headers) or LATR_GATEWAY_CLIENT_CREDENTIAL / VITE_LATR_GATEWAY_CLIENT_CREDENTIAL (legacy official header). On Vercel, enable them for Preview as well as Production when using testing.latr.link, then redeploy.`
   );
 }
