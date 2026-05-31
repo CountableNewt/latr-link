@@ -158,9 +158,10 @@ public func buildRouter(services: GatewayServices) -> Router<BasicRequestContext
 
             switch body {
             case let .url(url):
-                let ogFields = await fetchOpenGraphMetadata(url: url, httpClient: services.httpClient)
+                let trimmed = url.trimmingCharacters(in: .whitespacesAndNewlines)
+                let ogFields = await fetchOpenGraphMetadata(url: trimmed, httpClient: services.httpClient)
                 let preview = ogFields.map(openGraphPreview(from:))
-                try await library.save(url: url, preview: preview)
+                try await library.save(url: trimmed, preview: preview)
                 return try jsonResponse(SaveOKResponse(ok: true, kind: "url"), status: .created)
             case let .subject(subjectURI, linkedWebURL):
                 let linked = linkedWebURL?.trimmingCharacters(in: .whitespacesAndNewlines)

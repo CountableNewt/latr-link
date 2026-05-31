@@ -71,6 +71,60 @@ export function savedItemHasProtocolPreview(item: SavedItemRecord): boolean {
   );
 }
 
+export function openGraphFieldsHavePreview(fields: {
+  title?: string;
+  description?: string;
+  image?: string;
+  siteName?: string;
+  author?: string;
+}): boolean {
+  return Boolean(
+    fields.title?.trim() ||
+      fields.image?.trim() ||
+      fields.description?.trim() ||
+      fields.siteName?.trim() ||
+      fields.author?.trim()
+  );
+}
+
+function resolvedPreviewFromOpenGraphFields(
+  fields: {
+    title?: string;
+    description?: string;
+    image?: string;
+    siteName?: string;
+    author?: string;
+  },
+  item: SavedItemRecord,
+  kind: ResolvedPreview["kind"] = "external"
+): ResolvedPreview {
+  const linked = item.linkedWebUrl?.trim();
+  const canonicalUrl = linked || undefined;
+  let siteLabel = fields.siteName?.trim();
+  if (!siteLabel && canonicalUrl) {
+    try {
+      siteLabel = new URL(canonicalUrl).hostname;
+    } catch {
+      siteLabel = undefined;
+    }
+  }
+
+  return {
+    kind,
+    title:
+      fields.title?.trim() ||
+      siteLabel ||
+      canonicalUrl ||
+      item.subjectUri,
+    subtitle: previewSubtitle(fields.description, fields.author),
+    href: canonicalUrl,
+    imageHref: fields.image?.trim(),
+    canonicalUrl,
+    siteLabel,
+    authorLabel: fields.author?.trim(),
+  };
+}
+
 /** Build a row preview from on-protocol `com.latr.saved.item` fields (no network). */
 export function previewFromSavedItemRecord(
   rec: RepoRecord<SavedItemRecord>
@@ -126,6 +180,19 @@ export async function resolveSubjectPreviewForRow(
       const merged = mergeSavedItemOgPreview(fromProtocol, rec.value);
       writeCachedSubjectPreview(subjectUri, fingerprint, merged);
       return merged;
+    }
+  }
+
+  const linked = rec.value.linkedWebUrl?.trim();
+  if (linked) {
+    const og = await repo.fetchOpenGraphPreview(linked);
+    if (og && openGraphFieldsHavePreview(og)) {
+      const fromOg = mergeSavedItemOgPreview(
+        resolvedPreviewFromOpenGraphFields(og, rec.value),
+        rec.value
+      );
+      writeCachedSubjectPreview(subjectUri, fingerprint, fromOg);
+      return fromOg;
     }
   }
 

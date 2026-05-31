@@ -2,10 +2,12 @@ import AsyncHTTPClient
 import Foundation
 import NIOCore
 
-private let userAgent =
-    "Mozilla/5.0 (compatible; L@tr.link/1.0; +https://latr.link) AppleWebKit/537.36 (KHTML, like Gecko)"
-private let fetchTimeoutSeconds: Int64 = 10
-private let maxRedirects = 5
+/// Browser-like UA — many sites omit or block OG tags for obvious bot user agents.
+public let ogFetchUserAgent =
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+
+private let fetchTimeoutSeconds: Int64 = 15
+private let maxRedirects = 8
 
 public enum FetchURLResult: Sendable {
     case success(text: String, finalURL: String)
@@ -18,7 +20,8 @@ public func fetchURLBodyLimited(
     accept: String = "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8",
     httpClient: HTTPClient
 ) async -> FetchURLResult {
-    guard var currentURL = URL(string: target) else {
+    let trimmed = target.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard var currentURL = URL(string: trimmed) else {
         return .failure(reason: "invalid_url")
     }
 
@@ -34,13 +37,15 @@ public func fetchURLBodyLimited(
         for _ in 0 ... maxRedirects {
             var request = HTTPClientRequest(url: currentURL.absoluteString)
             request.headers.add(name: "Accept", value: accept)
-            request.headers.add(name: "User-Agent", value: userAgent)
+            request.headers.add(name: "Accept-Language", value: "en-US,en;q=0.9")
+            request.headers.add(name: "Cache-Control", value: "no-cache")
+            request.headers.add(name: "User-Agent", value: ogFetchUserAgent)
 
             let response = try await httpClient.execute(request, timeout: .seconds(fetchTimeoutSeconds))
 
             if [301, 302, 303, 307, 308].contains(response.status.code),
                let location = response.headers.first(name: "Location"),
-               let nextURL = URL(string: location, relativeTo: currentURL)
+               let nextURL = URL(string: location, relativeTo: currentURL)?.absoluteURL
             {
                 currentURL = nextURL
                 if blockingReasonOGFetch(currentURL.host ?? "") != nil {

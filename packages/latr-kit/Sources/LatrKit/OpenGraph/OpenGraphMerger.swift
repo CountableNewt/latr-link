@@ -4,12 +4,16 @@ enum OpenGraphMerger {
     static func externalSaveNeedsPreview(_ record: ExternalSave) -> Bool {
         !hasFilledString(record.title)
             || !hasFilledString(record.image)
+            || !hasFilledString(record.excerpt)
+            || !hasFilledString(record.site)
             || !hasFilledString(record.author)
     }
 
     static func savedItemNeedsPreview(_ record: SavedItem) -> Bool {
         !hasFilledString(record.previewTitle)
             || !hasFilledString(record.previewImage)
+            || !hasFilledString(record.previewExcerpt)
+            || !hasFilledString(record.previewSite)
             || !hasFilledString(record.previewAuthor)
     }
 

@@ -22,6 +22,8 @@ final class OpenGraphMergerTests: XCTestCase {
             fingerprint: "abc",
             createdAt: "2026-01-01T00:00:00Z",
             title: "Headline",
+            excerpt: "Lead",
+            site: "Example",
             image: "https://example.com/og.png",
             author: "Ada Lovelace"
         )

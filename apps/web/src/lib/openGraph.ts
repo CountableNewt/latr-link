@@ -167,29 +167,79 @@ function parseAuthor(scope: string, html: string): string | undefined {
   ]);
 }
 
-/**
- * Parse Open Graph and Twitter fallback metadata from HTML.
- * Relative `og:image` values are resolved against `resolvedPageUrl` (typically the redirect-final URL).
- */
-export function parseOpenGraphMarkup(
+function parseJsonLdMetadata(html: string): { title?: string; image?: string } {
+  const scriptRe =
+    /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  const titlePatterns = [
+    /"headline"\s*:\s*"([^"]+)"/i,
+    /"title"\s*:\s*"([^"]+)"/i,
+  ];
+  const imagePatterns = [
+    /"image"\s*:\s*"([^"]+)"/i,
+    /"image"\s*:\s*\{[^}]*"url"\s*:\s*"([^"]+)"/i,
+    /"thumbnailUrl"\s*:\s*"([^"]+)"/i,
+  ];
+
+  let title: string | undefined;
+  let image: string | undefined;
+
+  for (const match of html.matchAll(scriptRe)) {
+    const block = match[1];
+    if (!block) continue;
+
+    if (!title) {
+      for (const pattern of titlePatterns) {
+        const m = pattern.exec(block);
+        const parsed = normalizeMetaValue(m?.[1] ?? "");
+        if (parsed) {
+          title = parsed;
+          break;
+        }
+      }
+    }
+
+    if (!image) {
+      for (const pattern of imagePatterns) {
+        const m = pattern.exec(block);
+        const parsed = normalizeMetaValue(m?.[1] ?? "");
+        if (parsed) {
+          image = parsed;
+          break;
+        }
+      }
+    }
+
+    if (title && image) break;
+  }
+
+  return { title, image };
+}
+
+function parseOpenGraphFields(
+  scope: string,
   html: string,
   resolvedPageUrl: string
 ): OpenGraphFields {
-  const slice = sliceForMarkup(html);
+  const jsonLd = parseJsonLdMetadata(html);
 
   const title =
-    metaTagContent(slice, "property", "og:title") ??
-    metaTagContent(slice, "name", "twitter:title") ??
-    parseDocumentTitle(slice);
+    metaTagContent(scope, "property", "og:title") ??
+    metaTagContent(scope, "name", "twitter:title") ??
+    jsonLd.title ??
+    parseDocumentTitle(scope);
 
   const description =
-    metaTagContent(slice, "property", "og:description") ??
-    metaTagContent(slice, "name", "twitter:description") ??
-    metaTagContent(slice, "name", "description");
+    metaTagContent(scope, "property", "og:description") ??
+    metaTagContent(scope, "name", "twitter:description") ??
+    metaTagContent(scope, "name", "description");
 
-  const siteName = metaTagContent(slice, "property", "og:site_name");
-  const author = parseAuthor(slice, html);
-  const image = parseImage(slice, resolvedPageUrl);
+  const siteName = metaTagContent(scope, "property", "og:site_name");
+  const author = parseAuthor(scope, html);
+  const image =
+    parseImage(scope, resolvedPageUrl) ??
+    (jsonLd.image
+      ? toAbsoluteHref(resolvedPageUrl, jsonLd.image) ?? jsonLd.image
+      : undefined);
 
   return {
     ...(title ? { title } : {}),
@@ -198,4 +248,44 @@ export function parseOpenGraphMarkup(
     ...(siteName ? { siteName } : {}),
     ...(author ? { author } : {}),
   };
+}
+
+function mergeFields(
+  primary: OpenGraphFields,
+  fallback: OpenGraphFields
+): OpenGraphFields {
+  return {
+    ...(primary.title ?? fallback.title ? { title: primary.title ?? fallback.title } : {}),
+    ...(primary.description ?? fallback.description
+      ? { description: primary.description ?? fallback.description }
+      : {}),
+    ...(primary.image ?? fallback.image
+      ? { image: primary.image ?? fallback.image }
+      : {}),
+    ...(primary.siteName ?? fallback.siteName
+      ? { siteName: primary.siteName ?? fallback.siteName }
+      : {}),
+    ...(primary.author ?? fallback.author
+      ? { author: primary.author ?? fallback.author }
+      : {}),
+  };
+}
+
+/**
+ * Parse Open Graph and Twitter fallback metadata from HTML.
+ * Relative `og:image` values are resolved against `resolvedPageUrl` (typically the redirect-final URL).
+ */
+export function parseOpenGraphMarkup(
+  html: string,
+  resolvedPageUrl: string
+): OpenGraphFields {
+  const headSlice = sliceForMarkup(html);
+  const fromHead = parseOpenGraphFields(headSlice, html, resolvedPageUrl);
+
+  if (fromHead.title && fromHead.image) {
+    return fromHead;
+  }
+
+  const fromDocument = parseOpenGraphFields(html, html, resolvedPageUrl);
+  return mergeFields(fromHead, fromDocument);
 }

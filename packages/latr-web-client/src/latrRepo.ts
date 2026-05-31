@@ -12,6 +12,14 @@ import { COLLECTION_SAVED_ITEM } from "./latrRecords";
 
 export type { RepoRecord } from "./latrRecords";
 
+export type OpenGraphPreviewFields = {
+  title?: string;
+  description?: string;
+  image?: string;
+  siteName?: string;
+  author?: string;
+};
+
 export class LatrRepo {
   private readAgent: Agent;
 
@@ -96,6 +104,23 @@ export class LatrRepo {
       `/v1/latr/saves/${encodeURIComponent(itemRkey)}`,
       { method: "DELETE" }
     );
+  }
+
+  /** Server-side OG scrape (same path used during external saves). */
+  async fetchOpenGraphPreview(
+    url: string
+  ): Promise<OpenGraphPreviewFields | null> {
+    const trimmed = url.trim();
+    if (!trimmed) return null;
+    try {
+      const params = new URLSearchParams({ url: trimmed });
+      return await latrGatewayJson<OpenGraphPreviewFields>(
+        this.oauthSession,
+        `/v1/latr/og-preview?${params.toString()}`
+      );
+    } catch {
+      return null;
+    }
   }
 
   /**

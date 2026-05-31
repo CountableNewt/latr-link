@@ -200,24 +200,118 @@ private func parseAuthor(scope: String, html: String) -> String? {
     ])
 }
 
-public func parseOpenGraphMarkup(html: String, resolvedPageURL: String) -> OpenGraphFields {
-    let slice = sliceForMarkup(html)
+private func parseJsonLdMetadata(_ html: String) -> (title: String?, image: String?) {
+    guard let scriptRegex = try? NSRegularExpression(
+        pattern: #"<script[^>]*type=["']application/ld\+json["'][^>]*>([\s\S]*?)</script>"#,
+        options: [.caseInsensitive]
+    ) else {
+        return (nil, nil)
+    }
 
-    let title = metaTagContent(scope: slice, kind: "property", key: "og:title")
-        ?? metaTagContent(scope: slice, kind: "name", key: "twitter:title")
-        ?? parseDocumentTitle(slice)
+    let titlePatterns = [
+        #""headline"\s*:\s*"([^"]+)""#,
+        #""title"\s*:\s*"([^"]+)""#,
+    ]
+    let imagePatterns = [
+        #""image"\s*:\s*"([^"]+)""#,
+        #""image"\s*:\s*\{[^}]*"url"\s*:\s*"([^"]+)""#,
+        #""thumbnailUrl"\s*:\s*"([^"]+)""#,
+    ]
+    let titleRegexes = titlePatterns.compactMap {
+        try? NSRegularExpression(pattern: $0, options: [.caseInsensitive])
+    }
+    let imageRegexes = imagePatterns.compactMap {
+        try? NSRegularExpression(pattern: $0, options: [.caseInsensitive])
+    }
 
-    let description = metaTagContent(scope: slice, kind: "property", key: "og:description")
-        ?? metaTagContent(scope: slice, kind: "name", key: "twitter:description")
-        ?? metaTagContent(scope: slice, kind: "name", key: "description")
+    var title: String?
+    var image: String?
+    let range = NSRange(html.startIndex..., in: html)
+    let matches = scriptRegex.matches(in: html, range: range)
 
-    let siteName = metaTagContent(scope: slice, kind: "property", key: "og:site_name")
+    for match in matches {
+        guard let blockRange = Range(match.range(at: 1), in: html) else { continue }
+        let block = String(html[blockRange])
+        let blockNSRange = NSRange(block.startIndex..., in: block)
+
+        if title == nil {
+            for regex in titleRegexes {
+                if let titleMatch = regex.firstMatch(in: block, range: blockNSRange),
+                   let capture = Range(titleMatch.range(at: 1), in: block),
+                   let parsed = normalizeMetaValue(String(block[capture]))
+                {
+                    title = parsed
+                    break
+                }
+            }
+        }
+
+        if image == nil {
+            for regex in imageRegexes {
+                if let imageMatch = regex.firstMatch(in: block, range: blockNSRange),
+                   let capture = Range(imageMatch.range(at: 1), in: block),
+                   let parsed = normalizeMetaValue(String(block[capture]))
+                {
+                    image = parsed
+                    break
+                }
+            }
+        }
+
+        if title != nil, image != nil { break }
+    }
+
+    return (title, image)
+}
+
+private func mergeFields(_ primary: OpenGraphFields, fallback: OpenGraphFields) -> OpenGraphFields {
+    OpenGraphFields(
+        title: primary.title ?? fallback.title,
+        description: primary.description ?? fallback.description,
+        image: primary.image ?? fallback.image,
+        siteName: primary.siteName ?? fallback.siteName,
+        author: primary.author ?? fallback.author
+    )
+}
+
+private func parseOpenGraphFields(in scope: String, html: String, resolvedPageURL: String) -> OpenGraphFields {
+    let jsonLd = parseJsonLdMetadata(html)
+
+    let title = firstDefined([
+        metaTagContent(scope: scope, kind: "property", key: "og:title"),
+        metaTagContent(scope: scope, kind: "name", key: "twitter:title"),
+        jsonLd.title,
+        parseDocumentTitle(scope),
+    ])
+
+    let description = metaTagContent(scope: scope, kind: "property", key: "og:description")
+        ?? metaTagContent(scope: scope, kind: "name", key: "twitter:description")
+        ?? metaTagContent(scope: scope, kind: "name", key: "description")
+
+    let siteName = metaTagContent(scope: scope, kind: "property", key: "og:site_name")
+
+    var image = parseImage(scope: scope, resolvedPageURL: resolvedPageURL)
+    if image == nil, let jsonImage = jsonLd.image {
+        image = toAbsoluteHref(resolvedPageURL: resolvedPageURL, raw: jsonImage) ?? jsonImage
+    }
 
     return OpenGraphFields(
         title: title,
         description: description,
-        image: parseImage(scope: slice, resolvedPageURL: resolvedPageURL),
+        image: image,
         siteName: siteName,
-        author: parseAuthor(scope: slice, html: html)
+        author: parseAuthor(scope: scope, html: html)
     )
+}
+
+public func parseOpenGraphMarkup(html: String, resolvedPageURL: String) -> OpenGraphFields {
+    let headSlice = sliceForMarkup(html)
+    let fromHead = parseOpenGraphFields(in: headSlice, html: html, resolvedPageURL: resolvedPageURL)
+
+    if fromHead.title != nil, fromHead.image != nil {
+        return fromHead
+    }
+
+    let fromDocument = parseOpenGraphFields(in: html, html: html, resolvedPageURL: resolvedPageURL)
+    return mergeFields(fromHead, fallback: fromDocument)
 }
