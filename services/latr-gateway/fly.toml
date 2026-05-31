@@ -1,7 +1,5 @@
-# Deploy from services/latr-gateway (app directory):
-#   bash deploy.sh dev
-# Or:
-#   bash prepare-docker.sh && fly deploy --config fly.toml --app latr-link-dev-gateway --remote-only
+# Deploy from services/latr-gateway (LatrKit via SwiftPM from GitHub):
+#   bash services/latr-gateway/deploy.sh dev
 
 app = 'latr-link-dev-gateway'
 primary_region = 'ams'

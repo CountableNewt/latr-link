@@ -1,12 +1,5 @@
 import Foundation
 
-public enum AppEnvironment: String, Sendable {
-    case local
-    case dev
-    case prod
-    case test
-}
-
 public struct GatewayConfig: Sendable {
     public let port: Int
     public let appEnv: AppEnvironment

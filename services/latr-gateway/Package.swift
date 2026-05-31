@@ -10,7 +10,7 @@ let package = Package(
         .executable(name: "LatrGateway", targets: ["LatrGateway"]),
     ],
     dependencies: [
-        .package(path: "../../packages/latr-kit"), // Fly/Docker: restore GitHub pin after publishing latr-kit
+        .package(url: "https://github.com/Stygian-Tech/latr-kit.git", revision: "96b702b1b1914b3aeba0bd98b45271b64dc7d59b"),
         .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.0.0"),
         .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.25.0"),
         .package(url: "https://github.com/apple/swift-crypto.git", from: "3.12.0"),

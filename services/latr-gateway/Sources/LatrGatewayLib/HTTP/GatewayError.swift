@@ -13,11 +13,6 @@ public struct GatewayError: Error, Sendable {
     }
 }
 
-public struct ErrorBody: Encodable, Sendable {
-    public let error: String
-    public let message: String
-}
-
 public func jsonResponse<T: Encodable>(
     _ body: T,
     status: HTTPResponse.Status = .ok

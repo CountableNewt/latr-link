@@ -5,16 +5,6 @@ import Logging
 private let maxHTMLBytes = 512 * 1024
 private let ogLogger = Logger(label: "latr-gateway.og")
 
-public struct DiscoverAtURIResult: Encodable, Sendable {
-    public let subjectUri: String?
-    public let warning: String?
-
-    public init(subjectUri: String?, warning: String? = nil) {
-        self.subjectUri = subjectUri
-        self.warning = warning
-    }
-}
-
 public func discoverAtURIFromURL(
     _ rawURL: String,
     httpClient: HTTPClient,

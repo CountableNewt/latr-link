@@ -15,8 +15,9 @@ latr-link/
   apps/
     web/           # Next.js web client (Bun)
   packages/
-    lexicons/    # com.latr.* lexicon JSON
-    latr-kit/    # Swift LatrKit library
+    latr-web-client/  # shared save/gateway client (Bun)
+  services/
+    latr-gateway/     # Swift/Hummingbird gateway (LatrKit via GitHub SwiftPM)
   docs/
     architecture/
 ```
@@ -72,4 +73,4 @@ See [docs/architecture/overview.md](docs/architecture/overview.md).
 
 ## Lexicons
 
-See [packages/lexicons/README.md](packages/lexicons/README.md).
+Canonical `com.latr.*` schemas live in **[Stygian-Tech/latr-packages](https://github.com/Stygian-Tech/latr-packages)** (`packages/lexicons/`). This repo installs them via the root `latr-packages` git dependency — do not duplicate lexicon JSON here.

@@ -1,50 +1,6 @@
 import Crypto
 import Foundation
 import HTTPTypes
-#if canImport(Darwin)
-import Darwin
-#else
-import Glibc
-#endif
-
-public struct RegisteredClientRecord: Codable, Sendable, Equatable {
-    public var keyHash: String
-    public var displayName: String?
-    public var createdAt: String
-
-    public init(keyHash: String, displayName: String? = nil, createdAt: String) {
-        self.keyHash = keyHash
-        self.displayName = displayName
-        self.createdAt = createdAt
-    }
-}
-
-private struct ClientRegistryFile: Codable {
-    var clients: [String: RegisteredClientRecord]
-}
-
-public struct RegisteredClientSummary: Encodable, Sendable {
-    public let clientId: String
-    public let displayName: String?
-    public let createdAt: String
-    public let source: String
-}
-
-public struct RegisterClientBody: Decodable, Sendable {
-    public let clientId: String
-    public let displayName: String?
-}
-
-public struct RegisterClientResponse: Encodable, Sendable {
-    public let clientId: String
-    public let clientCredential: String
-    public let displayName: String?
-    public let createdAt: String
-}
-
-public struct ListClientsResponse: Encodable, Sendable {
-    public let clients: [RegisteredClientSummary]
-}
 
 /// Persisted gateway client credentials merged with official env credentials.
 public actor ClientRegistry {
@@ -288,15 +244,4 @@ public func extractBearerToken(from authorization: String) -> String? {
     guard trimmed.lowercased().hasPrefix("bearer ") else { return nil }
     let token = String(trimmed.dropFirst(7)).trimmingCharacters(in: .whitespacesAndNewlines)
     return token.isEmpty ? nil : token
-}
-
-func timingSafeEqual(_ lhs: String, _ rhs: String) -> Bool {
-    let left = Array(lhs.utf8)
-    let right = Array(rhs.utf8)
-    guard left.count == right.count else { return false }
-    var difference: UInt8 = 0
-    for index in left.indices {
-        difference |= left[index] ^ right[index]
-    }
-    return difference == 0
 }

@@ -1,13 +1,6 @@
 import Foundation
 import HTTPTypes
 import Logging
-import PostgresNIO
-
-public struct DeveloperStoreSnapshot: Codable, Sendable {
-    var clients: [String: DeveloperClientRecord]
-    var apiKeys: [String: DeveloperApiKeyRecord]
-    var usage: [String: Int]
-}
 
 /// JSON-backed developer store for local dev without `DATABASE_URL`.
 public actor PersistentDeveloperStore: DeveloperStore {
@@ -140,28 +133,5 @@ extension InMemoryDeveloperStore {
         clients = snapshot.clients
         apiKeys = snapshot.apiKeys
         usage = snapshot.usage
-    }
-}
-
-public enum DeveloperStoreFactory {
-    public static func make(
-        config: GatewayConfig,
-        postgres: PostgresClient? = nil,
-        logger: Logger = Logger(label: "latr-gateway")
-    ) -> any DeveloperStore {
-        if config.appEnv == .test {
-            return InMemoryDeveloperStore(officialEnvCredentials: config.officialClientCredentials)
-        }
-        if let postgres, config.databaseURL != nil {
-            return PostgresDeveloperStore(
-                pool: postgres,
-                officialEnvCredentials: config.officialClientCredentials,
-                logger: logger
-            )
-        }
-        return PersistentDeveloperStore(
-            officialEnvCredentials: config.officialClientCredentials,
-            storeURL: config.developerStoreURL
-        )
     }
 }

@@ -2,24 +2,6 @@ import AsyncHTTPClient
 import Foundation
 import LatrKit
 
-public struct FederatedSubjectClientConfig: Sendable {
-    public let plcURL: String
-    /// AppView bases used after DID-document discovery (deduped fallbacks).
-    public let appViewBaseURLs: [String]
-    /// Identity relay used before PDS/identity endpoints from DID documents.
-    public let identityBaseURL: String
-
-    public init(
-        plcURL: String,
-        appViewBaseURLs: [String] = [FederatedSubjectClient.defaultAppViewBaseURL],
-        identityBaseURL: String = FederatedSubjectClient.defaultIdentityBaseURL
-    ) {
-        self.plcURL = plcURL
-        self.appViewBaseURLs = appViewBaseURLs
-        self.identityBaseURL = identityBaseURL
-    }
-}
-
 /// PDS-first public record reads with DID-document AppView discovery and env fallbacks.
 public struct FederatedSubjectClient: AppViewFeedClient, UntypedRecordClient, Sendable {
     public static let defaultAppViewBaseURL = "https://public.api.bsky.app"
@@ -244,33 +226,4 @@ public struct FederatedSubjectClient: AppViewFeedClient, UntypedRecordClient, Se
         guard body.readableBytes > 0 else { return [:] }
         return (try JSONSerialization.jsonObject(with: Data(buffer: body)) as? [String: Any]) ?? [:]
     }
-}
-
-private final class LockStorage<T>: @unchecked Sendable {
-    private let lock = NSLock()
-    private var stored: T
-
-    init(_ value: T) {
-        self.stored = value
-    }
-
-    var value: T {
-        get {
-            lock.lock()
-            defer { lock.unlock() }
-            return stored
-        }
-        set {
-            lock.lock()
-            stored = newValue
-            lock.unlock()
-        }
-    }
-}
-
-/// Backward-compatible alias while callers migrate.
-public typealias BlueskyAppViewClient = FederatedSubjectClient
-
-public enum BlueskyAppView {
-    public static let publicBaseURL = FederatedSubjectClient.defaultAppViewBaseURL
 }

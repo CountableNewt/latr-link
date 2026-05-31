@@ -7,7 +7,6 @@ cd "$ROOT"
 
 SWIFT_PACKAGES=(
   services/latr-gateway
-  packages/latr-kit
 )
 
 for dir in "${SWIFT_PACKAGES[@]}"; do

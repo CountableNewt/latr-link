@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy latr-gateway from services/latr-gateway (LatrKit via SwiftPM on Fly build).
+# Deploy latr-gateway from services/latr-gateway (LatrKit resolves from GitHub via SwiftPM).
 #
 # Usage: bash deploy.sh dev|main
 set -euo pipefail

@@ -5,7 +5,8 @@
 - **Web (`apps/web`)** — Next.js App Router, ATProto OAuth in the browser, thin client to the L@tr gateway for save/list/state workflows.
 - **Gateway (`services/latr-gateway`)** — Swift/Hummingbird HTTP service: OAuth/DPoP gate, PDS write-through, server-side Open Graph fetch, Standard.site AT URI discovery.
 - **`Stygian-Tech/latr-kit`** (GitHub) — Swift **`LatrKit`** library (`SavedLibrary`, `RepositoryClient`, `URLNormalizer`, …). SwiftPM git dependency from `services/latr-gateway`.
-- **`packages/lexicons`** — Lexicon JSON for `com.latr.saved.external` and `com.latr.saved.item`.
+- **`Stygian-Tech/latr-packages`** (GitHub) — TS contracts (`gateway-client`, `record-keys`, lexicons). Root git dependency; not duplicated under `packages/`.
+- **`packages/latr-web-client`** — Monorepo-only shared save/gateway client for web + extension (no separate org repo).
 
 ```mermaid
 flowchart LR

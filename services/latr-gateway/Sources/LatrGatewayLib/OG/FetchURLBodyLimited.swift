@@ -9,11 +9,6 @@ public let ogFetchUserAgent =
 private let fetchTimeoutSeconds: Int64 = 15
 private let maxRedirects = 8
 
-public enum FetchURLResult: Sendable {
-    case success(text: String, finalURL: String)
-    case failure(reason: String)
-}
-
 public func fetchURLBodyLimited(
     target: String,
     maxBytes: Int,
