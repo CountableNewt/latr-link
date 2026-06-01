@@ -94,14 +94,6 @@ public struct GatewayConfig: Sendable {
             requireKnown = appEnv == .prod
         }
 
-        let allowed = parseTokenSet(env["OAUTH_GATEWAY_ALLOWED_CLIENT_IDS"])
-        if !allowed.isEmpty {
-            fputs(
-                "warning: OAUTH_GATEWAY_ALLOWED_CLIENT_IDS is deprecated and ignored; register clients via the developer store instead\n",
-                stderr
-            )
-        }
-
         let requireClientAPIKey: Bool
         if let raw = env["LATR_GATEWAY_REQUIRE_CLIENT_API_KEY"] {
             requireClientAPIKey = parseBool(raw)
@@ -166,14 +158,6 @@ private func parseURLList(_ value: String?, defaultValue: [String]) -> [String] 
 private func parseBool(_ value: String) -> Bool {
     let v = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     return ["1", "true", "yes", "on"].contains(v)
-}
-
-private func parseTokenSet(_ value: String?) -> Set<String> {
-    guard let value, !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-        return []
-    }
-    let parts = value.split { $0.isWhitespace || $0 == "," }.map(String.init)
-    return Set(parts.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })
 }
 
 private func resolvedClientRegistryURL(from env: [String: String]) -> URL {
