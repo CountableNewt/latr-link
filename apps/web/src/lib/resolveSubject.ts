@@ -78,11 +78,36 @@ export function previewKindForSubjectUri(
 
 function subjectPreviewLooksResolved(
   preview: ResolvedPreview,
-  subjectUri: string
+  subjectUri: string,
+  item: SavedItemRecord
+): boolean {
+  if (preview.title.trim() === subjectUri) return false;
+  return previewHasRichMetadata(preview, item);
+}
+
+/** True when the preview has more than a bare URL placeholder for a linked save. */
+export function previewHasRichMetadata(
+  preview: ResolvedPreview,
+  item?: SavedItemRecord
 ): boolean {
   if (preview.kind === "unknown") return false;
   const title = preview.title.trim();
-  if (!title || title === subjectUri) return false;
+  if (!title) return false;
+
+  if (Boolean(preview.imageHref?.trim()) || Boolean(preview.subtitle?.trim())) {
+    return true;
+  }
+
+  const linked = item?.linkedWebUrl?.trim();
+  if (!linked) return true;
+
+  if (title === linked) return false;
+  try {
+    if (new URL(title).href === new URL(linked).href) return false;
+  } catch {
+    /* title is not a URL — treat as rich */
+  }
+
   return true;
 }
 
@@ -200,6 +225,7 @@ export async function resolveSubjectPreviewForRow(
   if (cached) return cached;
 
   const subjectKind = previewKindForSubjectUri(subjectUri);
+  const linked = rec.value.linkedWebUrl?.trim();
 
   if (savedItemHasProtocolPreview(rec.value)) {
     const fromProtocol = previewFromSavedItemRecord(rec);
@@ -210,8 +236,20 @@ export async function resolveSubjectPreviewForRow(
     }
   }
 
+  if (linked && !savedItemHasProtocolPreview(rec.value)) {
+    const og = await repo.fetchOpenGraphPreview(linked);
+    if (og && openGraphFieldsHavePreview(og)) {
+      const fromOg = mergeSavedItemOgPreview(
+        resolvedPreviewFromOpenGraphFields(og, rec.value, subjectKind),
+        rec.value
+      );
+      writeCachedSubjectPreview(subjectUri, fingerprint, fromOg);
+      return fromOg;
+    }
+  }
+
   const fromSubject = await resolveSubjectPreview(repo, subjectUri);
-  if (subjectPreviewLooksResolved(fromSubject, subjectUri)) {
+  if (subjectPreviewLooksResolved(fromSubject, subjectUri, rec.value)) {
     const merged = mergeSavedItemOgPreview(
       {
         ...fromSubject,
@@ -224,8 +262,10 @@ export async function resolveSubjectPreviewForRow(
     return merged;
   }
 
-  const linked = rec.value.linkedWebUrl?.trim();
-  if (linked) {
+  if (linked && !previewHasRichMetadata(
+    mergeSavedItemOgPreview({ ...fromSubject, kind: subjectKind }, rec.value),
+    rec.value
+  )) {
     const og = await repo.fetchOpenGraphPreview(linked);
     if (og && openGraphFieldsHavePreview(og)) {
       const fromOg = mergeSavedItemOgPreview(

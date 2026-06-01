@@ -4,6 +4,7 @@ import type { SavedItemRecord } from "@/lib/latrRecords";
 import type { RepoRecord } from "@/lib/latrRepo";
 import {
   previewFromSavedItemRecord,
+  previewHasRichMetadata,
   savedItemHasProtocolPreview,
 } from "@/lib/resolveSubject";
 import {
@@ -38,7 +39,7 @@ function savedItem(
 
 afterEach(() => {
   if (typeof window !== "undefined") {
-    window.localStorage.removeItem("latr.link.saved-preview.v2");
+    window.localStorage.removeItem("latr.link.saved-preview.v3");
   }
 });
 
@@ -90,6 +91,34 @@ describe("Preview from Saved Item Record", () => {
       })
     );
     expect(preview?.kind).toBe("post");
+  });
+});
+
+describe("Preview Has Rich Metadata", () => {
+  test("URL-only Title Is Not Rich When linkedWebUrl Is Set", () => {
+    expect(
+      previewHasRichMetadata(
+        {
+          kind: "external",
+          title: "https://example.com/article",
+          href: "https://example.com/article",
+        },
+        savedItem().value
+      )
+    ).toBe(false);
+  });
+
+  test("Title With Image Is Rich", () => {
+    expect(
+      previewHasRichMetadata(
+        {
+          kind: "external",
+          title: "Example Headline",
+          imageHref: "https://example.com/og.png",
+        },
+        savedItem().value
+      )
+    ).toBe(true);
   });
 });
 
