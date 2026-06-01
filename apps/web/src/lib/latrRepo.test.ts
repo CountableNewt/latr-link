@@ -47,27 +47,39 @@ function mockOAuthSession(
 }
 
 describe("Latrrepo Gateway Facade", () => {
-  test("listSavedItems reads saved items from the PDS", async () => {
+  test("listSavedItems reads saved items from the gateway", async () => {
     const calls: string[] = [];
     const oauth = mockOAuthSession(async (url, init) => {
       calls.push(`${init?.method ?? "GET"} ${url}`);
-      return new Response(JSON.stringify({ records: [] }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({
+          records: [
+            {
+              uri: "at://did:plc:viewer/com.latr.saved.item/item1",
+              cid: "cid",
+              value: {
+                $type: "com.latr.saved.item",
+                subjectUri:
+                  "at://did:plc:viewer/com.latr.saved.external/ext1",
+                savedAt: "2026-06-01T12:00:00.000Z",
+              },
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
     });
 
     const repo = new LatrRepo(oauth, "did:plc:viewer");
     const items = await repo.listSavedItems();
-    expect(items).toHaveLength(0);
+    expect(items).toHaveLength(1);
     expect(
       calls.some(
         (call) =>
-          call.includes("com.atproto.repo.listRecords") &&
-          call.includes("com.latr.saved.item")
+          call.startsWith("GET") &&
+          call.includes("127.0.0.1:8080/v1/latr/saves")
       )
     ).toBe(true);
-    expect(calls.some((call) => call.includes("/v1/latr/saves"))).toBe(false);
   });
 
   test("saveExternalUrl POSTs URL Body", async () => {

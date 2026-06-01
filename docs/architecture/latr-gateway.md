@@ -83,6 +83,8 @@ Developer management routes are listed above.
 
 Record mutations are implemented in Swift **LatrKit** (`SavedLibrary`). Open Graph metadata is stored on `com.latr.saved.external` / `com.latr.saved.item`.
 
+**Client read path:** list saved items via **`GET /v1/latr/saves`** (not direct PDS `listRecords`). L@tr.link and The Social Wire use the gateway for list, save, archive, and delete so app credentials and OAuth policy apply consistently.
+
 ## URL save pipeline
 
 Clients should call **`POST /v1/latr/saves { kind: "url", url }`** only. The gateway runs a single SSRF-safe fetch and:

@@ -1,14 +1,13 @@
-/**
- * Thin gateway client for L@tr save/list/state workflows.
- * Read-only cross-repo record fetches still use OAuth Agent where needed.
- */
-import { Agent } from "@atproto/api";
 import type { OAuthSession } from "@atproto/oauth-client-browser";
+import { Agent } from "@atproto/api";
 import { AtUri } from "@atproto/syntax";
+import {
+  LATR_GATEWAY_SAVES_PATH,
+  type LatrGatewaySavedItemsResponse,
+} from "latr-packages/gateway-client";
 
 import { latrGatewayJson } from "./latrGatewayClient";
 import type { RepoRecord, SavedItemRecord } from "./latrRecords";
-import { COLLECTION_SAVED_ITEM } from "./latrRecords";
 
 export type { RepoRecord } from "./latrRecords";
 
@@ -39,30 +38,10 @@ export class LatrRepo {
   }
 
   async listSavedItems(): Promise<RepoRecord<SavedItemRecord>[]> {
-    const records: RepoRecord<SavedItemRecord>[] = [];
-    let cursor: string | undefined;
-
-    do {
-      const page = await this.readAgent.api.com.atproto.repo.listRecords({
-        repo: this.did,
-        collection: COLLECTION_SAVED_ITEM,
-        limit: 100,
-        cursor,
-      });
-
-      for (const row of page.data.records ?? []) {
-        if (!row.uri || !row.cid || !row.value) continue;
-        records.push({
-          uri: row.uri,
-          cid: row.cid,
-          value: row.value as unknown as SavedItemRecord,
-        });
-      }
-
-      cursor = page.data.cursor;
-    } while (cursor);
-
-    return records;
+    const response = await latrGatewayJson<
+      LatrGatewaySavedItemsResponse<SavedItemRecord>
+    >(this.oauthSession, LATR_GATEWAY_SAVES_PATH, { method: "GET" });
+    return response.records ?? [];
   }
 
   async saveExternalUrl(url: string): Promise<SaveUrlResponse> {
