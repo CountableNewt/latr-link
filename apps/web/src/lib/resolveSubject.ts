@@ -230,7 +230,10 @@ export async function resolveSubjectPreviewForRow(
   if (savedItemHasProtocolPreview(rec.value)) {
     const fromProtocol = previewFromSavedItemRecord(rec);
     if (fromProtocol) {
-      const merged = mergeSavedItemOgPreview(fromProtocol, rec.value);
+      let merged = mergeSavedItemOgPreview(fromProtocol, rec.value);
+      if (linked) {
+        merged = await backfillPreviewImageFromOpenGraph(repo, merged, linked);
+      }
       writeCachedSubjectPreview(subjectUri, fingerprint, merged);
       return merged;
     }
@@ -283,6 +286,24 @@ export async function resolveSubjectPreviewForRow(
   );
   writeCachedSubjectPreview(subjectUri, fingerprint, merged);
   return merged;
+}
+
+async function backfillPreviewImageFromOpenGraph(
+  repo: LatrRepo,
+  preview: ResolvedPreview,
+  linkedWebUrl: string
+): Promise<ResolvedPreview> {
+  if (preview.imageHref?.trim()) return preview;
+
+  const og = await repo.fetchOpenGraphPreview(linkedWebUrl);
+  if (!og?.image?.trim()) return preview;
+
+  return {
+    ...preview,
+    imageHref: og.image.trim(),
+    subtitle:
+      preview.subtitle || previewSubtitle(og.description, og.author),
+  };
 }
 
 /** Prefer cached OG fields from `com.latr.saved.item` when the user saved from a web URL. */
