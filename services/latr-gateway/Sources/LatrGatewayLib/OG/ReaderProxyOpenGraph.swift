@@ -78,13 +78,14 @@ public func parseReaderProxyJSONResponse(_ json: String, sourceURL: String) -> O
         return nil
     }
 
-    return OpenGraphFields(
+    let fields = OpenGraphFields(
         title: title?.isEmpty == false ? title : siteName,
         description: description?.isEmpty == false ? description : nil,
         image: image,
         siteName: siteName,
         author: author?.isEmpty == false ? author : nil
     )
+    return sanitizeRemoteOpenGraphFields(fields, pageURL: sourceURL)
 }
 
 public func parseReaderProxyResponse(_ text: String, sourceURL: String) -> OpenGraphFields? {
@@ -117,11 +118,14 @@ public func parseReaderProxyResponse(_ text: String, sourceURL: String) -> OpenG
     let siteName = hostnameLabel(from: sourceURL)
     guard title?.isEmpty == false || image?.isEmpty == false || siteName != nil else { return nil }
 
-    return OpenGraphFields(
-        title: title?.isEmpty == false ? title : siteName,
-        description: description?.isEmpty == false ? description : nil,
-        image: image,
-        siteName: siteName
+    return sanitizeRemoteOpenGraphFields(
+        OpenGraphFields(
+            title: title?.isEmpty == false ? title : siteName,
+            description: description?.isEmpty == false ? description : nil,
+            image: image,
+            siteName: siteName
+        ),
+        pageURL: sourceURL
     )
 }
 

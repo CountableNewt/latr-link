@@ -84,28 +84,27 @@ private func enhanceOpenGraphFields(
     current: OpenGraphFields,
     httpClient: HTTPClient
 ) async -> OpenGraphFields {
-    var enhanced = current
+    async let microlinkTask = fetchOpenGraphViaMicrolink(url: url, httpClient: httpClient)
+    async let readerTask = fetchOpenGraphViaReaderProxy(url: url, httpClient: httpClient)
+    async let cardybTask = fetchOpenGraphViaCardyb(url: url, httpClient: httpClient)
 
-    if let microlink = await fetchOpenGraphViaMicrolink(url: url, httpClient: httpClient),
-       microlink.hasAnyValue
-    {
-        ogResolverLogger.info("OG enhanced via microlink", metadata: ["url": .string(url)])
-        enhanced = enrichOpenGraphFields(
-            mergeOpenGraphFields(primary: microlink, fallback: enhanced),
-            resolvedPageURL: url
-        )
+    var candidates = [current]
+    if let microlink = await microlinkTask {
+        candidates.append(microlink)
+        ogResolverLogger.info("OG provider microlink", metadata: ["url": .string(url)])
+    }
+    if let reader = await readerTask {
+        candidates.append(reader)
+        ogResolverLogger.info("OG provider reader", metadata: ["url": .string(url)])
+    }
+    if let cardyb = await cardybTask {
+        candidates.append(cardyb)
+        ogResolverLogger.info("OG provider cardyb", metadata: ["url": .string(url)])
     }
 
-    if openGraphNeedsReaderEnhancement(fields: enhanced, signals: nil, pageURL: url),
-       let reader = await fetchOpenGraphViaReaderProxy(url: url, httpClient: httpClient),
-       reader.hasAnyValue
-    {
-        ogResolverLogger.info("OG enhanced via reader proxy", metadata: ["url": .string(url)])
-        enhanced = enrichOpenGraphFields(
-            mergeOpenGraphFields(primary: reader, fallback: enhanced),
-            resolvedPageURL: url
-        )
-    }
-
-    return enhanced
+    let best = bestOpenGraphFields(candidates: candidates, pageURL: url)
+    return enrichOpenGraphFields(
+        mergeOpenGraphFields(primary: best, fallback: current),
+        resolvedPageURL: url
+    )
 }

@@ -214,7 +214,7 @@ export function LibraryChrome({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div className="flex min-h-app">
+    <div className="flex h-app max-h-app min-h-0 overflow-hidden">
       {mobileNavOpen ? (
         <button
           type="button"
@@ -225,7 +225,7 @@ export function LibraryChrome({ children }: { children: ReactNode }) {
       ) : null}
 
       <aside
-        className={`flex h-full max-h-app w-56 shrink-0 flex-col border-r border-zinc-200 bg-white transition-transform duration-200 ease-out dark:border-zinc-800 dark:bg-zinc-900 max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-[100] max-md:shadow-xl md:relative md:z-auto md:h-auto md:max-h-none md:translate-x-0 md:shadow-none ${mobileNavOpen ? "max-md:translate-x-0" : "max-md:pointer-events-none max-md:-translate-x-full md:pointer-events-auto"}`}
+        className={`flex h-full max-h-app w-56 shrink-0 flex-col overflow-hidden border-r border-zinc-200 bg-white transition-transform duration-200 ease-out dark:border-zinc-800 dark:bg-zinc-900 max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-[100] max-md:shadow-xl md:sticky md:top-[var(--env-banner-offset)] md:translate-x-0 ${mobileNavOpen ? "max-md:translate-x-0" : "max-md:pointer-events-none max-md:-translate-x-full md:pointer-events-auto"}`}
         aria-hidden={
           isMd === false && !mobileNavOpen ? true : undefined
         }
@@ -233,7 +233,7 @@ export function LibraryChrome({ children }: { children: ReactNode }) {
         <LibrarySidebarBody {...sidebarBodyProps} />
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <header
           className="md:hidden sticky top-[var(--env-banner-offset)] z-30 flex h-12 shrink-0 items-center gap-2 border-b border-zinc-200 bg-zinc-50/95 px-3 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-950/95"
         >
@@ -251,7 +251,9 @@ export function LibraryChrome({ children }: { children: ReactNode }) {
             Library
           </span>
         </header>
-        <EmbeddedReaderPortal>{children}</EmbeddedReaderPortal>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <EmbeddedReaderPortal>{children}</EmbeddedReaderPortal>
+        </div>
       </div>
     </div>
   );

@@ -19,4 +19,12 @@ body {
   .min-h-app {
     min-height: calc(100dvh - var(--env-banner-offset));
   }
+
+  .h-app {
+    height: calc(100dvh - var(--env-banner-offset));
+  }
+
+  .max-h-app {
+    max-height: calc(100dvh - var(--env-banner-offset));
+  }
 }

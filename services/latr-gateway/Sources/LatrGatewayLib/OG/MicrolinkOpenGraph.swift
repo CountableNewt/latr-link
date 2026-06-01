@@ -40,7 +40,10 @@ func fetchOpenGraphViaMicrolink(url: String, httpClient: HTTPClient) async -> Op
 }
 
 public func parseMicrolinkResponse(_ json: String, sourceURL: String) -> OpenGraphFields? {
-    guard let payload = try? JSONDecoder().decode(MicrolinkResponse.self, from: Data(json.utf8)).data else {
+    guard let response = try? JSONDecoder().decode(MicrolinkResponse.self, from: Data(json.utf8)),
+          response.status == "success",
+          let payload = response.data
+    else {
         return nil
     }
 
@@ -55,11 +58,12 @@ public func parseMicrolinkResponse(_ json: String, sourceURL: String) -> OpenGra
         return nil
     }
 
-    return OpenGraphFields(
+    let fields = OpenGraphFields(
         title: title?.isEmpty == false ? title : siteName,
         description: description?.isEmpty == false ? description : nil,
         image: image?.isEmpty == false ? image : nil,
         siteName: siteName,
         author: author?.isEmpty == false ? author : nil
     )
+    return sanitizeRemoteOpenGraphFields(fields, pageURL: sourceURL)
 }
