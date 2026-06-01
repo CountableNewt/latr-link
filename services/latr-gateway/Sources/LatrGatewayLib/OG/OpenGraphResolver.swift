@@ -50,17 +50,11 @@ public func resolveOpenGraphForURL(
         openGraphMetaSignals(html: $0, resolvedPageURL: resolvedURL)
     }
 
-    if openGraphNeedsReaderEnhancement(fields: fields, signals: signals, pageURL: trimmed),
-       let proxyFields = await fetchOpenGraphViaReaderProxy(url: trimmed, httpClient: httpClient),
-       proxyFields.hasAnyValue
-    {
-        ogResolverLogger.info(
-            "OG enhanced via reader proxy",
-            metadata: ["url": .string(trimmed)]
-        )
-        fields = enrichOpenGraphFields(
-            mergeOpenGraphFields(primary: proxyFields, fallback: fields),
-            resolvedPageURL: trimmed
+    if openGraphNeedsReaderEnhancement(fields: fields, signals: signals, pageURL: trimmed) {
+        fields = await enhanceOpenGraphFields(
+            url: trimmed,
+            current: fields,
+            httpClient: httpClient
         )
     } else if fields.hasAnyValue {
         ogResolverLogger.info(
@@ -83,4 +77,35 @@ public func resolveOpenGraphForURL(
         metadata: ["url": .string(trimmed)]
     )
     return enrichOpenGraphFields(degradedOpenGraphFields(from: trimmed), resolvedPageURL: trimmed)
+}
+
+private func enhanceOpenGraphFields(
+    url: String,
+    current: OpenGraphFields,
+    httpClient: HTTPClient
+) async -> OpenGraphFields {
+    var enhanced = current
+
+    if let microlink = await fetchOpenGraphViaMicrolink(url: url, httpClient: httpClient),
+       microlink.hasAnyValue
+    {
+        ogResolverLogger.info("OG enhanced via microlink", metadata: ["url": .string(url)])
+        enhanced = enrichOpenGraphFields(
+            mergeOpenGraphFields(primary: microlink, fallback: enhanced),
+            resolvedPageURL: url
+        )
+    }
+
+    if openGraphNeedsReaderEnhancement(fields: enhanced, signals: nil, pageURL: url),
+       let reader = await fetchOpenGraphViaReaderProxy(url: url, httpClient: httpClient),
+       reader.hasAnyValue
+    {
+        ogResolverLogger.info("OG enhanced via reader proxy", metadata: ["url": .string(url)])
+        enhanced = enrichOpenGraphFields(
+            mergeOpenGraphFields(primary: reader, fallback: enhanced),
+            resolvedPageURL: url
+        )
+    }
+
+    return enhanced
 }

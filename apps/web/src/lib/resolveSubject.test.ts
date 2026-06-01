@@ -39,7 +39,7 @@ function savedItem(
 
 afterEach(() => {
   if (typeof window !== "undefined") {
-    window.localStorage.removeItem("latr.link.saved-preview.v5");
+    window.localStorage.removeItem("latr.link.saved-preview.v6");
   }
 });
 

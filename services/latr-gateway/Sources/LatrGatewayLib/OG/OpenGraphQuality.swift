@@ -82,7 +82,19 @@ public func isWeakOpenGraphTitle(
         return true
     }
 
+    if isSlugDerivedTitle(title, pageURL: pageURL) {
+        return true
+    }
+
     return false
+}
+
+func isSlugDerivedTitle(_ title: String, pageURL: String) -> Bool {
+    guard let url = URL(string: pageURL) else { return false }
+    let parts = url.pathComponents.filter { $0 != "/" && !$0.isEmpty }
+    guard let last = parts.last else { return false }
+    let slugTitle = humanizeURLSlug(last)
+    return title.caseInsensitiveCompare(slugTitle) == .orderedSame
 }
 
 public func mergeOpenGraphFields(primary: OpenGraphFields, fallback: OpenGraphFields) -> OpenGraphFields {

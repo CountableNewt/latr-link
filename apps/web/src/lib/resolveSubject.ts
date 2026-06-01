@@ -340,6 +340,21 @@ function isWeakPreviewTitle(
   const genericTitles = ["home", "homepage", "the verge", "verge", "news", "latest"];
   if (genericTitles.includes(lower)) return true;
 
+  try {
+    const parts = new URL(linkedWebUrl).pathname.split("/").filter(Boolean);
+    const last = parts[parts.length - 1];
+    if (last) {
+      const slugTitle = last
+        .replace(/_/g, "-")
+        .split("-")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+      if (trimmed.toLowerCase() === slugTitle.toLowerCase()) return true;
+    }
+  } catch {
+    /* ignore */
+  }
+
   return false;
 }
 
