@@ -47,10 +47,22 @@ function mockOAuthSession(
 }
 
 describe("Latrrepo Gateway Facade", () => {
-  test("listSavedItems reads saved items from the gateway", async () => {
+  test("listSavedItems migrates legacy lexicons then reads saved items", async () => {
     const calls: string[] = [];
     const oauth = mockOAuthSession(async (url, init) => {
       calls.push(`${init?.method ?? "GET"} ${url}`);
+      if (url.includes("/v1/latr/migrate-lexicons")) {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            externalCopied: 0,
+            itemsCopied: 0,
+            externalDeleted: 0,
+            itemsDeleted: 0,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
       return new Response(
         JSON.stringify({
           records: [
@@ -73,6 +85,13 @@ describe("Latrrepo Gateway Facade", () => {
     const repo = new LatrRepo(oauth, "did:plc:viewer");
     const items = await repo.listSavedItems();
     expect(items).toHaveLength(1);
+    expect(
+      calls.some(
+        (call) =>
+          call.startsWith("POST") &&
+          call.includes("127.0.0.1:8080/v1/latr/migrate-lexicons")
+      )
+    ).toBe(true);
     expect(
       calls.some(
         (call) =>

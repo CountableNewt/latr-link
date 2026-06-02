@@ -2,7 +2,9 @@ import type { OAuthSession } from "@atproto/oauth-client-browser";
 import { Agent } from "@atproto/api";
 import { AtUri } from "@atproto/syntax";
 import {
+  LATR_GATEWAY_MIGRATE_LEXICONS_PATH,
   LATR_GATEWAY_SAVES_PATH,
+  type LatrGatewayLexiconMigrationResponse,
   type LatrGatewaySavedItemsResponse,
 } from "latr-packages/gateway-client";
 
@@ -38,10 +40,29 @@ export class LatrRepo {
   }
 
   async listSavedItems(): Promise<RepoRecord<SavedItemRecord>[]> {
+    await this.migrateLegacyLexiconsIfNeeded();
     const response = await latrGatewayJson<
       LatrGatewaySavedItemsResponse<SavedItemRecord>
     >(this.oauthSession, LATR_GATEWAY_SAVES_PATH, { method: "GET" });
     return response.records ?? [];
+  }
+
+  /** One-time legacy `com.latr.*` → `link.latr.*` migration (retries until complete). */
+  private async migrateLegacyLexiconsIfNeeded(): Promise<void> {
+    const maxAttempts = 8;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const summary = await latrGatewayJson<LatrGatewayLexiconMigrationResponse>(
+        this.oauthSession,
+        LATR_GATEWAY_MIGRATE_LEXICONS_PATH,
+        { method: "POST" }
+      );
+      const changed =
+        summary.externalCopied > 0 ||
+        summary.itemsCopied > 0 ||
+        summary.externalDeleted > 0 ||
+        summary.itemsDeleted > 0;
+      if (!changed) return;
+    }
   }
 
   async saveExternalUrl(url: string): Promise<SaveUrlResponse> {

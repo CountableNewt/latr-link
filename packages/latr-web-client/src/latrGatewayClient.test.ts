@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import type { OAuthSession } from "@atproto/oauth-client-browser";
-import { LATR_UPSTREAM_DPOP_HEADER } from "latr-packages/gateway-client";
+import {
+  LATR_GATEWAY_MIGRATE_LEXICONS_PATH,
+  LATR_UPSTREAM_DPOP_HEADER,
+} from "latr-packages/gateway-client";
 
 import { configureLatrGateway } from "./latrGatewayConfig";
 import { latrGatewayFetch } from "./latrGatewayClient";
@@ -54,7 +57,7 @@ function mockOAuthSession(
 }
 
 describe("latrGatewayFetch upstream proofs", () => {
-  test("GET /v1/latr/saves sends a multi-proof upstream pool", async () => {
+  test("GET /v1/latr/saves sends list-only upstream proofs", async () => {
     let upstreamHeader = "";
 
     const oauth = mockOAuthSession(async (_url, init) => {
@@ -69,6 +72,57 @@ describe("latrGatewayFetch upstream proofs", () => {
 
     await latrGatewayFetch(oauth, "/v1/latr/saves", { method: "GET" });
 
-    expect(upstreamHeader.split(",")).toHaveLength(16);
+    expect(upstreamHeader.split(",")).toHaveLength(8);
+  });
+
+  test("POST /v1/latr/migrate-lexicons sends migration upstream proofs", async () => {
+    let upstreamHeader = "";
+
+    const oauth = mockOAuthSession(async (_url, init) => {
+      upstreamHeader = String(
+        new Headers(init?.headers).get(LATR_UPSTREAM_DPOP_HEADER) ?? ""
+      );
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          externalCopied: 0,
+          itemsCopied: 0,
+          externalDeleted: 0,
+          itemsDeleted: 0,
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    });
+
+    await latrGatewayFetch(oauth, LATR_GATEWAY_MIGRATE_LEXICONS_PATH, {
+      method: "POST",
+    });
+
+    expect(upstreamHeader.split(",")).toHaveLength(32);
+  });
+
+  test("POST /v1/latr/saves sends save upstream proofs", async () => {
+    let upstreamHeader = "";
+
+    const oauth = mockOAuthSession(async (_url, init) => {
+      upstreamHeader = String(
+        new Headers(init?.headers).get(LATR_UPSTREAM_DPOP_HEADER) ?? ""
+      );
+      return new Response(JSON.stringify({ ok: true, kind: "url" }), {
+        status: 201,
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+
+    await latrGatewayFetch(oauth, "/v1/latr/saves", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind: "url", url: "https://example.com" }),
+    });
+
+    expect(upstreamHeader.split(",")).toHaveLength(8);
   });
 });

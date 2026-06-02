@@ -47,7 +47,6 @@ public func buildRouter(services: GatewayServices) -> Router<BasicRequestContext
     latr.get("saves") { request, _ in
         await handleProtected(request: request, services: services) { auth in
             let library = services.savedLibrary(for: auth)
-            _ = try await library.migrateLegacyLexiconsIfNeeded()
             let items = try await library.savedItems()
             return try jsonResponse(SavedItemsResponse(records: items))
         }

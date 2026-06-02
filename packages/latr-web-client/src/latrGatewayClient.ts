@@ -1,8 +1,8 @@
 import type { OAuthSession } from "@atproto/oauth-client-browser";
 import {
-  createSaveUpstreamDpopProofPool,
   createUpstreamDpopProof,
   createUpstreamDpopProofPool,
+  LATR_GATEWAY_MIGRATE_LEXICONS_PATH,
   LATR_GATEWAY_SAVES_PATH,
   LATR_UPSTREAM_DPOP_HEADER,
   pdsXrpcMethodForGatewayRequest,
@@ -25,8 +25,20 @@ export type LatrGatewayFetchOptions = {
   skipClientCredential?: boolean;
 };
 
-/** Upstream proofs for GET /v1/latr/saves (legacy migration probes, list, and writes). */
+/** Upstream proofs for GET /v1/latr/saves (paginated listRecords only). */
 export async function createListSavesUpstreamDpopProofPool(
+  oauthSession: OAuthSession,
+  options: UpstreamDpopProofOptions = {}
+): Promise<string> {
+  return createUpstreamDpopProofPool(
+    oauthSession,
+    [{ xrpcMethod: "com.atproto.repo.listRecords", httpMethod: "GET", count: 8 }],
+    options
+  );
+}
+
+/** Upstream proofs for POST /v1/latr/migrate-lexicons (legacy copy + delete). */
+export async function createMigrateLexiconsUpstreamDpopProofPool(
   oauthSession: OAuthSession,
   options: UpstreamDpopProofOptions = {}
 ): Promise<string> {
@@ -34,8 +46,23 @@ export async function createListSavesUpstreamDpopProofPool(
     oauthSession,
     [
       { xrpcMethod: "com.atproto.repo.listRecords", httpMethod: "GET", count: 8 },
+      { xrpcMethod: "com.atproto.repo.createRecord", httpMethod: "POST", count: 12 },
+      { xrpcMethod: "com.atproto.repo.deleteRecord", httpMethod: "POST", count: 12 },
+    ],
+    options
+  );
+}
+
+/** Upstream proofs for POST /v1/latr/saves (external wrapper + saved item writes). */
+export async function createSaveUpstreamDpopProofPool(
+  oauthSession: OAuthSession,
+  options: UpstreamDpopProofOptions = {}
+): Promise<string> {
+  return createUpstreamDpopProofPool(
+    oauthSession,
+    [
       { xrpcMethod: "com.atproto.repo.createRecord", httpMethod: "POST", count: 4 },
-      { xrpcMethod: "com.atproto.repo.deleteRecord", httpMethod: "POST", count: 4 },
+      { xrpcMethod: "com.atproto.repo.putRecord", httpMethod: "POST", count: 4 },
     ],
     options
   );
@@ -68,6 +95,10 @@ export async function latrGatewayFetch(
     await primePdsDpopNonce(oauthSession);
     upstreamHeaders[LATR_UPSTREAM_DPOP_HEADER] =
       await createSaveUpstreamDpopProofPool(oauthSession, proofOptions);
+  } else if (method === "POST" && gatewayPath === LATR_GATEWAY_MIGRATE_LEXICONS_PATH) {
+    await primePdsDpopNonce(oauthSession);
+    upstreamHeaders[LATR_UPSTREAM_DPOP_HEADER] =
+      await createMigrateLexiconsUpstreamDpopProofPool(oauthSession, proofOptions);
   } else if (method === "GET" && gatewayPath === LATR_GATEWAY_SAVES_PATH) {
     await primePdsDpopNonce(oauthSession);
     upstreamHeaders[LATR_UPSTREAM_DPOP_HEADER] =
