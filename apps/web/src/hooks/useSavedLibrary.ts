@@ -45,7 +45,7 @@ export function useSavedLibrary() {
     queryKey: ["saved-library", session?.did],
     queryFn: () => buildLibrary(repo!),
     enabled: !!repo && !!session,
-    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: "always",
   });
 }
 
