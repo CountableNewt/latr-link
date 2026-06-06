@@ -34,6 +34,13 @@ public func errorResponse(_ error: Error) -> Response {
             status: gatewayError.status
         )) ?? Response(status: gatewayError.status)
     }
+    if error is DecodingError {
+        print("Decode error: \(error)")
+        return (try? jsonResponse(
+            ErrorBody(error: "decode_error", message: "Response could not be decoded"),
+            status: .badGateway
+        )) ?? Response(status: .badGateway)
+    }
     print("Internal error: \(error)")
     return (try? jsonResponse(
         ErrorBody(error: "internal_error", message: "Internal server error"),

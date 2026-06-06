@@ -237,14 +237,22 @@ public struct PDSRepositoryClient: RepositoryClient, Sendable {
             useAuth: true
         )
         let rawRecords = json["records"] as? [[String: Any]] ?? []
-        let records: [RepositoryRecord<Value>] = try rawRecords.compactMap { entry in
+        var records: [RepositoryRecord<Value>] = []
+        records.reserveCapacity(rawRecords.count)
+        for entry in rawRecords {
             guard let uri = entry["uri"] as? String,
                   let cid = entry["cid"] as? String,
                   let value = entry["value"]
-            else { return nil }
-            let valueData = try JSONSerialization.data(withJSONObject: value)
-            let decoded = try JSONDecoder().decode(Value.self, from: valueData)
-            return RepositoryRecord(uri: uri, cid: cid, value: decoded)
+            else { continue }
+            do {
+                let valueData = try JSONSerialization.data(withJSONObject: value)
+                let decoded = try JSONDecoder().decode(Value.self, from: valueData)
+                records.append(RepositoryRecord(uri: uri, cid: cid, value: decoded))
+            } catch {
+                print(
+                    "Skipping undecodable PDS record \(uri) in \(collection.identifier): \(error)"
+                )
+            }
         }
         let nextCursor = json["cursor"] as? String
         return RecordList(records: records, cursor: nextCursor)
@@ -267,8 +275,16 @@ public struct PDSRepositoryClient: RepositoryClient, Sendable {
             return nil
         }
         let valueData = try JSONSerialization.data(withJSONObject: value)
-        let decoded = try JSONDecoder().decode(Value.self, from: valueData)
-        return RepositoryRecord(uri: uri, cid: cid, value: decoded)
+        do {
+            let decoded = try JSONDecoder().decode(Value.self, from: valueData)
+            return RepositoryRecord(uri: uri, cid: cid, value: decoded)
+        } catch {
+            throw GatewayError(
+                status: .badGateway,
+                message: "PDS record could not be decoded",
+                code: "pds_record_decode"
+            )
+        }
     }
 
     public func createRecord(
