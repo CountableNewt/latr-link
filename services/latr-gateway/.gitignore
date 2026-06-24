@@ -1,0 +1,12 @@
+.build/
+.swiftpm/
+Package.resolved
+*.xcodeproj
+data/
+vendor/
+
+# Spilled Swift incremental build outputs (normally under .build/)
+*.swiftmodule
+*.swiftdeps
+*.d
+*.dia

@@ -1,11 +1,11 @@
 # L@tr (latr.link)
 
-Read-later on your own ATProto repo. Saved state lives in `com.latr.saved.item` and `com.latr.saved.external` — no Stygian backend required for core functionality.
+Read-later on your own ATProto repo. Saved state lives in `link.latr.saved.item` and `link.latr.saved.external` — no Stygian backend required for core functionality.
 
 ```
 Next.js (latr.link)  ── ATProto OAuth ──►  Your PDS
-                         XRPC            com.latr.saved.item
-                                         com.latr.saved.external
+                         XRPC            link.latr.saved.item
+                                         link.latr.saved.external
 ```
 
 ## Monorepo layout
@@ -15,8 +15,9 @@ latr-link/
   apps/
     web/           # Next.js web client (Bun)
   packages/
-    lexicons/    # com.latr.* lexicon JSON
-    latr-kit/    # URL normalization, rkey helpers, shared types
+    latr-web-client/  # shared save/gateway client (Bun)
+  services/
+    latr-gateway/     # Swift/Hummingbird gateway (LatrKit via GitHub SwiftPM)
   docs/
     architecture/
 ```
@@ -72,4 +73,4 @@ See [docs/architecture/overview.md](docs/architecture/overview.md).
 
 ## Lexicons
 
-See [packages/lexicons/README.md](packages/lexicons/README.md).
+Canonical `link.latr.*` schemas live in **[Stygian-Tech/latr-packages](https://github.com/Stygian-Tech/latr-packages)** (`packages/lexicons/`). Legacy `com.latr.*` repo rows are migrated automatically by the gateway on list.

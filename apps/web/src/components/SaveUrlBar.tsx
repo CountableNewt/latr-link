@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 
+import { Button } from "@/components/ui/button";
 import { useInvalidateSavedLibrary } from "@/hooks/useSavedLibrary";
 import { useLatrRepo } from "@/hooks/useLatrRepo";
 import { showSaveOutcomeDebugLabels } from "@/lib/environmentBanner";
@@ -14,6 +15,16 @@ const savePathDebugChip =
 type SaveFeedback =
   | { mode: "plain"; text: string }
   | { mode: "debug"; detail: string };
+
+function debugDetailForSave(
+  kind: "subject" | "url",
+  storage?: "native" | "external"
+): string {
+  if (kind === "subject" || storage === "native") {
+    return "Saved AT Proto Record.";
+  }
+  return "Saved Link.";
+}
 
 export function SaveUrlBar() {
   const repo = useLatrRepo();
@@ -28,30 +39,30 @@ export function SaveUrlBar() {
     setBusy(true);
     setFeedback(null);
     try {
-      const resolved = await resolvePasteForSave(paste);
+      const resolved = resolvePasteForSave(paste);
       if (resolved.kind === "subject") {
-        await repo.saveSubjectUri(resolved.subjectUri, {
-          linkedWebUrl: resolved.discoveryWebUrl,
-        });
+        const response = await repo.saveSubjectUri(resolved.subjectUri);
         if (!showSaveOutcomeDebugLabels()) {
           setFeedback({ mode: "plain", text: "Saved." });
-        } else if (resolved.via === "bsky-app") {
-          setFeedback({
-            mode: "debug",
-            detail: "Saved as AT Proto record (Bluesky post link).",
-          });
-        } else if (resolved.via === "standard-site") {
-          setFeedback({
-            mode: "debug",
-            detail:
-              "Saved AT Proto record (detected Standard.site link tag).",
-          });
         } else {
-          setFeedback({ mode: "debug", detail: "Saved AT Proto record." });
+          setFeedback({
+            mode: "debug",
+            detail: debugDetailForSave("subject", response.storage),
+          });
         }
       } else {
-        await repo.saveExternalUrl(resolved.normalizedUrl);
-        setFeedback({ mode: "plain", text: "Saved link." });
+        const response = await repo.saveUrl(resolved.url);
+        if (!showSaveOutcomeDebugLabels()) {
+          setFeedback({
+            mode: "plain",
+            text: response.storage === "native" ? "Saved." : "Saved Link.",
+          });
+        } else {
+          setFeedback({
+            mode: "debug",
+            detail: debugDetailForSave(response.kind, response.storage),
+          });
+        }
       }
       setPaste("");
       invalidate();
@@ -59,7 +70,7 @@ export function SaveUrlBar() {
       setFeedback({
         mode: "plain",
         text:
-          err instanceof Error ? err.message : "Could not save this paste.",
+          err instanceof Error ? err.message : "Could Not Save This Paste.",
       });
     } finally {
       setBusy(false);
@@ -74,7 +85,7 @@ export function SaveUrlBar() {
       >
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <label htmlFor="save-paste" className="text-xs font-medium text-zinc-500">
-            Save link or AT URI
+            Save Link or AT URI
           </label>
           <input
             id="save-paste"
@@ -89,18 +100,14 @@ export function SaveUrlBar() {
             className="h-9 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm dark:border-zinc-600 dark:bg-zinc-900"
           />
         </div>
-        <button
-          type="submit"
-          disabled={busy || !paste.trim() || !repo}
-          className="h-9 shrink-0 rounded-md bg-zinc-900 px-4 text-sm font-medium text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
-        >
+        <Button type="submit" disabled={busy || !paste.trim() || !repo}>
           {busy ? "Saving…" : "Save"}
-        </button>
+        </Button>
       </form>
       {feedback &&
         (feedback.mode === "debug" ? (
           <div className="px-4 pb-3">
-            <span className={savePathDebugChip} title="Save pathway (dev)">
+            <span className={savePathDebugChip} title="Save Pathway (Dev)">
               <span className="shrink-0 font-mono text-[10px] font-semibold uppercase tracking-wide opacity-95">
                 [DEBUG]
               </span>

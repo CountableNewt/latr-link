@@ -1,0 +1,12 @@
+# Gateway-local Fly/Docker context (services/latr-gateway).
+.build/
+.swiftpm/
+Package.resolved
+*.xcodeproj
+data/
+.env
+.env.*
+*.swiftmodule
+*.swiftdeps
+*.d
+*.dia

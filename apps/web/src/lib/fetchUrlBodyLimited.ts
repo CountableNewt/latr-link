@@ -5,8 +5,8 @@
 import { blockingReasonOgFetch } from "@/lib/ogFetchGuards";
 
 const UA =
-  "Mozilla/5.0 (compatible; L@tr.link/1.0; +https://latr.link) AppleWebKit/537.36 (KHTML, like Gecko)";
-const FETCH_TIMEOUT_MS = 10_000;
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
+const FETCH_TIMEOUT_MS = 15_000;
 
 function mergeChunks(chunks: Uint8Array[], totalLen: number): Uint8Array {
   const out = new Uint8Array(totalLen);
@@ -56,6 +56,8 @@ export async function fetchUrlBodyLimited(
         Accept:
           options.accept ??
           "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Cache-Control": "no-cache",
         "User-Agent": UA,
       },
     });

@@ -1,12 +1,15 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, useSyncExternalStore } from "react";
+import Image from "next/image";
 import Link from "next/link";
 
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import iconSrc from "@/app/icon.png";
 
 const callbackErrorMessage =
-  "Sign-in callback failed. Try an external browser (Chrome/Safari) if preview tools block WebSockets or storage.";
+  "Sign-In Callback Failed. Try an External Browser (Chrome/Safari) if Preview Tools Block WebSockets or Storage.";
 
 function getInitialCallbackError(): string | null {
   if (typeof window === "undefined") return null;
@@ -16,11 +19,27 @@ function getInitialCallbackError(): string | null {
   return params.get("message") || callbackErrorMessage;
 }
 
+function subscribeToLoginSearchParams(onStoreChange: () => void) {
+  window.addEventListener("popstate", onStoreChange);
+  return () => window.removeEventListener("popstate", onStoreChange);
+}
+
+function readCallbackErrorFromUrl(): string | null {
+  return getInitialCallbackError();
+}
+
 export default function LoginPage() {
   const { signIn } = useAuth();
   const [handle, setHandle] = useState("");
-  const [error, setError] = useState<string | null>(getInitialCallbackError);
+  const callbackError = useSyncExternalStore(
+    subscribeToLoginSearchParams,
+    readCallbackErrorFromUrl,
+    () => null
+  );
+  const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
+
+  const displayError = error ?? callbackError;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -32,7 +51,7 @@ export default function LoginPage() {
       setError(
         err instanceof Error
           ? err.message
-          : "Sign-in failed. Check your handle and try again."
+          : "Sign-In Failed. Check Your Handle and Try Again."
       );
       setIsPending(false);
     }
@@ -42,9 +61,19 @@ export default function LoginPage() {
     <div className="flex min-h-app flex-1 flex-col items-center justify-center gap-3 bg-zinc-50 p-4 dark:bg-zinc-950">
       <div className="w-full max-w-sm space-y-6 rounded-xl border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
         <div className="text-center">
+          <div className="mb-4 flex justify-center">
+            <Image
+              src={iconSrc}
+              alt=""
+              width={56}
+              height={56}
+              className="rounded-2xl"
+              priority
+            />
+          </div>
           <h1 className="text-2xl font-semibold tracking-tight">L@tr.link</h1>
           <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-            Read later — stored on your PDS, not our servers.
+            Read Later — Stored on Your PDS, Not Our Servers.
           </p>
         </div>
 
@@ -69,21 +98,22 @@ export default function LoginPage() {
             />
           </div>
 
-          {error && (
-            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+          {displayError && (
+            <p className="text-sm text-red-600 dark:text-red-400">{displayError}</p>
           )}
 
-          <button
+          <Button
             type="submit"
+            size="lg"
             disabled={isPending || !handle.trim()}
-            className="inline-flex h-10 w-full items-center justify-center rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:pointer-events-none disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
+            className="w-full"
           >
             {isPending ? "Signing in…" : "Continue with ATProto"}
-          </button>
+          </Button>
         </form>
       </div>
       <p className="text-center text-xs text-zinc-500">
-        New here?{" "}
+        New Here?{" "}
         <Link
           href="https://bsky.app"
           className="underline underline-offset-2"

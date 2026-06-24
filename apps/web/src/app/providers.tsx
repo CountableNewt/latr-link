@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import {
   QueryClient,
   type Query,
@@ -8,6 +8,11 @@ import {
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { AuthProvider } from "@/hooks/useAuth";
+import {
+  setInjectedGatewayClientCredential,
+  setInjectedGatewayClientCredentials,
+  syncLatrGatewayFromBrowser,
+} from "@/lib/latrGatewayUrl";
 
 const QUERY_PERSIST_KEY = "latr.link.react-query.v1";
 const QUERY_PERSIST_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7;
@@ -17,7 +22,36 @@ function shouldDehydrateQuery(query: Query): boolean {
   return Array.isArray(key) && key[0] === "saved-library";
 }
 
-export function Providers({ children }: { children: React.ReactNode }) {
+export function Providers({
+  children,
+  gatewayClientCredential,
+  gatewayClientId,
+  gatewayApiKey,
+}: {
+  children: React.ReactNode;
+  /** From server layout (`LATR_GATEWAY_CLIENT_CREDENTIAL` at request time). */
+  gatewayClientCredential?: string;
+  /** From server layout (`LATR_GATEWAY_CLIENT_ID` at request time). */
+  gatewayClientId?: string;
+  /** From server layout (`LATR_GATEWAY_API_KEY` at request time). */
+  gatewayApiKey?: string;
+}) {
+  setInjectedGatewayClientCredential(gatewayClientCredential);
+  setInjectedGatewayClientCredentials({
+    clientId: gatewayClientId,
+    apiKey: gatewayApiKey,
+  });
+  syncLatrGatewayFromBrowser();
+
+  useLayoutEffect(() => {
+    setInjectedGatewayClientCredential(gatewayClientCredential);
+    setInjectedGatewayClientCredentials({
+      clientId: gatewayClientId,
+      apiKey: gatewayApiKey,
+    });
+    syncLatrGatewayFromBrowser();
+  }, [gatewayClientCredential, gatewayClientId, gatewayApiKey]);
+
   const [queryClient] = useState(
     () =>
       new QueryClient({

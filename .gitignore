@@ -6,6 +6,8 @@ node_modules/
 # Build outputs
 .next/
 dist/
+.output/
+.wxt/
 .build/
 *.o
 
@@ -46,3 +48,10 @@ bun-debug.log*
 # Coverage
 coverage/
 *.lcov
+
+# swift build artifacts
+.build/
+*.swiftmodule
+*.swiftdeps
+*.d
+*.dia

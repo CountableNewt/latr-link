@@ -1,0 +1,33 @@
+{
+  "name": "extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wxt",
+    "dev:firefox": "wxt -b firefox",
+    "build": "wxt build",
+    "build:chromium": "wxt build -b chrome",
+    "build:firefox": "wxt build -b firefox",
+    "build:safari": "wxt build -b safari",
+    "zip": "wxt zip",
+    "zip:chromium": "wxt zip -b chrome",
+    "zip:firefox": "wxt zip -b firefox",
+    "lint": "node -e \"process.exit(0)\"",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "clean": "rm -rf .output .wxt dist"
+  },
+  "dependencies": {
+    "@atproto/oauth-client-browser": "^0.3.42",
+    "@atproto/oauth-types": "^0.6.3",
+    "latr-web-client": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.4",
+    "@types/chrome": "^0.0.287",
+    "@types/firefox-webext-browser": "^120.0.4",
+    "typescript": "^5",
+    "wxt": "^0.20.14"
+  }
+}
