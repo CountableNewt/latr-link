@@ -61,7 +61,9 @@ func verifyGatewayDPoP(
     guard payload.htm.uppercased() == request.method.rawValue.uppercased() else {
         throw GatewayError(status: .unauthorized, message: "DPoP method mismatch", code: "invalid_dpop")
     }
-    guard normalizeDPoPURL(payload.htu) == normalizeDPoPURL(gatewayRequestURL(request)) else {
+    guard gatewayRequestURLCandidates(request).contains(where: {
+        normalizeDPoPURL(payload.htu) == normalizeDPoPURL($0)
+    }) else {
         throw GatewayError(status: .unauthorized, message: "DPoP URL mismatch", code: "invalid_dpop")
     }
 
@@ -117,6 +119,15 @@ private func decodeDPoP<T: Decodable>(_ type: T.Type, from data: Data) throws ->
     }
 }
 
+private func gatewayRequestURLCandidates(_ request: Request) -> [String] {
+    var candidates = [gatewayRequestURL(request)]
+    candidates.append(contentsOf: forwardedGatewayRequestURLCandidates(request))
+    if let original = originalRequestURL(request) {
+        candidates.append(original)
+    }
+    return Array(Set(candidates))
+}
+
 private func gatewayRequestURL(_ request: Request) -> String {
     if request.uri.description.hasPrefix("http://") || request.uri.description.hasPrefix("https://") {
         return request.uri.description
@@ -124,6 +135,49 @@ private func gatewayRequestURL(_ request: Request) -> String {
     let scheme = request.head.scheme ?? "http"
     let authority = request.head.authority ?? "localhost"
     return "\(scheme)://\(authority)\(request.uri)"
+}
+
+private func forwardedGatewayRequestURLCandidates(_ request: Request) -> [String] {
+    guard let forwardedHost = firstHeader(request, names: ["X-Forwarded-Host"]),
+          !forwardedHost.isEmpty
+    else {
+        return []
+    }
+    let forwardedProto = firstHeader(request, names: ["X-Forwarded-Proto"]) ?? "https"
+    let path = request.uri.description
+    return [
+        "\(forwardedProto)://\(forwardedHost)\(path)",
+        "\(forwardedProto)://\(forwardedHost)/api/latr-gateway\(path)",
+    ]
+}
+
+private func originalRequestURL(_ request: Request) -> String? {
+    guard let raw = firstHeader(
+        request,
+        names: ["X-Original-URL", "X-Original-URI", "X-Forwarded-URI", "X-Rewrite-URL"]
+    ), !raw.isEmpty else {
+        return nil
+    }
+    if raw.hasPrefix("http://") || raw.hasPrefix("https://") {
+        return raw
+    }
+    let scheme = firstHeader(request, names: ["X-Forwarded-Proto"]) ?? request.head.scheme ?? "https"
+    let authority = firstHeader(request, names: ["X-Forwarded-Host"]) ?? request.head.authority ?? "localhost"
+    return "\(scheme)://\(authority)\(raw.hasPrefix("/") ? raw : "/\(raw)")"
+}
+
+private func firstHeader(_ request: Request, names: [String]) -> String? {
+    for name in names {
+        guard let field = HTTPField.Name(name),
+              let raw = request.headers[field]
+        else { continue }
+        if let value = raw.split(separator: ",").first.map({
+            String($0).trimmingCharacters(in: .whitespacesAndNewlines)
+        }), !value.isEmpty {
+            return value
+        }
+    }
+    return nil
 }
 
 private func normalizeDPoPURL(_ raw: String) -> String? {
