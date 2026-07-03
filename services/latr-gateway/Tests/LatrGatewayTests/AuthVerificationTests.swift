@@ -73,6 +73,31 @@ final class AuthVerificationTests: XCTestCase {
         )
     }
 
+    func testDPoPAcceptsHostedAuthorityWhenSchemeIsMissing() throws {
+        let key = P256.Signing.PrivateKey()
+        let jwk = jwk(for: key.publicKey)
+        let token = try signedAccessToken(signingKey: key, dpopJWK: jwk)
+        let proof = try signedDPoP(
+            signingKey: key,
+            jwk: jwk,
+            htm: "GET",
+            htu: "https://api.testing.latr.link/v1/latr/saves",
+            accessToken: token
+        )
+
+        XCTAssertNoThrow(
+            try verifyGatewayDPoP(
+                proof: proof,
+                accessToken: token,
+                request: request(
+                    path: "/v1/latr/saves",
+                    scheme: nil,
+                    authority: "api.testing.latr.link"
+                )
+            )
+        )
+    }
+
     func testOAuthVerifierRejectsTamperedAccessTokenSignature() async throws {
         let key = P256.Signing.PrivateKey()
         let jwk = jwk(for: key.publicKey)
@@ -100,12 +125,17 @@ final class AuthVerificationTests: XCTestCase {
         try await httpClient.shutdown()
     }
 
-    private func request(path: String, headers: HTTPFields = [:]) -> Request {
+    private func request(
+        path: String,
+        scheme: String? = "https",
+        authority: String? = "api.testing.latr.link",
+        headers: HTTPFields = [:]
+    ) -> Request {
         Request(
             head: HTTPRequest(
                 method: .get,
-                scheme: "https",
-                authority: "api.testing.latr.link",
+                scheme: scheme,
+                authority: authority,
                 path: path,
                 headerFields: headers
             ),

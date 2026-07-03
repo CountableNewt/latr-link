@@ -132,9 +132,17 @@ private func gatewayRequestURL(_ request: Request) -> String {
     if request.uri.description.hasPrefix("http://") || request.uri.description.hasPrefix("https://") {
         return request.uri.description
     }
-    let scheme = request.head.scheme ?? "http"
     let authority = request.head.authority ?? "localhost"
+    let scheme = request.head.scheme ?? inferredRequestScheme(forAuthority: authority)
     return "\(scheme)://\(authority)\(request.uri)"
+}
+
+private func inferredRequestScheme(forAuthority authority: String) -> String {
+    let host = authority.split(separator: ":").first.map(String.init) ?? authority
+    if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+        return "http"
+    }
+    return "https"
 }
 
 private func forwardedGatewayRequestURLCandidates(_ request: Request) -> [String] {
