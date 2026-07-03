@@ -2,6 +2,7 @@ import AsyncHTTPClient
 import Crypto
 import Foundation
 import Hummingbird
+import HTTPTypes
 @testable import LatrGatewayLib
 import NIOCore
 import XCTest
@@ -45,6 +46,33 @@ final class AuthVerificationTests: XCTestCase {
         )
     }
 
+    func testDPoPAcceptsForwardedProxyPrefixForSameGatewayRoute() throws {
+        let key = P256.Signing.PrivateKey()
+        let jwk = jwk(for: key.publicKey)
+        let token = try signedAccessToken(signingKey: key, dpopJWK: jwk)
+        let proof = try signedDPoP(
+            signingKey: key,
+            jwk: jwk,
+            htm: "GET",
+            htu: "https://testing.latr.link/api/latr-gateway/v1/latr/saves",
+            accessToken: token
+        )
+
+        XCTAssertNoThrow(
+            try verifyGatewayDPoP(
+                proof: proof,
+                accessToken: token,
+                request: request(
+                    path: "/v1/latr/saves",
+                    headers: [
+                        HTTPField.Name("X-Forwarded-Host")!: "testing.latr.link",
+                        HTTPField.Name("X-Forwarded-Proto")!: "https",
+                    ]
+                )
+            )
+        )
+    }
+
     func testOAuthVerifierRejectsTamperedAccessTokenSignature() async throws {
         let key = P256.Signing.PrivateKey()
         let jwk = jwk(for: key.publicKey)
@@ -72,13 +100,14 @@ final class AuthVerificationTests: XCTestCase {
         try await httpClient.shutdown()
     }
 
-    private func request(path: String) -> Request {
+    private func request(path: String, headers: HTTPFields = [:]) -> Request {
         Request(
             head: HTTPRequest(
                 method: .get,
                 scheme: "https",
                 authority: "api.testing.latr.link",
-                path: path
+                path: path,
+                headerFields: headers
             ),
             body: RequestBody(buffer: ByteBuffer())
         )
@@ -113,7 +142,8 @@ final class AuthVerificationTests: XCTestCase {
     ) throws -> String {
         let header = #"{"typ":"dpop+jwt","alg":"ES256","jwk":{"kty":"EC","crv":"P-256","x":"\#(jwk.x)","y":"\#(jwk.y)"}}"#
         let ath = base64URLEncode(Data(SHA256.hash(data: Data(accessToken.utf8))))
-        let payload = #"{"htm":"\#(htm)","htu":"\#(htu)","iat":1782860400,"jti":"\#(UUID().uuidString)","ath":"\#(ath)"}"#
+        let iat = Int(Date().timeIntervalSince1970)
+        let payload = #"{"htm":"\#(htm)","htu":"\#(htu)","iat":\#(iat),"jti":"\#(UUID().uuidString)","ath":"\#(ath)"}"#
         return try signJWT(header: header, payload: payload, signingKey: signingKey)
     }
 
