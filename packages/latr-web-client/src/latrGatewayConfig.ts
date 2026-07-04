@@ -68,11 +68,13 @@ function mergeGatewayConfigWithWindowBootstrap(
   const apiKey = bootstrap.apiKey?.trim();
   const clientCredential = bootstrap.clientCredential?.trim();
   const gatewayUrl = bootstrap.gatewayUrl?.trim();
+  const keepConfiguredProxy =
+    config.gatewayUrl?.trim() && isSameOriginGatewayProxyUrl(config.gatewayUrl.trim());
 
   return {
     ...config,
     ...(bootstrap.appEnv ? { appEnv: bootstrap.appEnv } : {}),
-    ...(gatewayUrl ? { gatewayUrl } : {}),
+    ...(gatewayUrl && !keepConfiguredProxy ? { gatewayUrl } : {}),
     ...(clientCredential ? { clientCredential } : {}),
     ...(clientId && apiKey ? { clientId, apiKey } : {}),
   };
