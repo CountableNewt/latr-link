@@ -98,6 +98,31 @@ final class AuthVerificationTests: XCTestCase {
         )
     }
 
+    func testDPoPAcceptsProofURLWithoutQueryString() throws {
+        let key = P256.Signing.PrivateKey()
+        let jwk = jwk(for: key.publicKey)
+        let token = try signedAccessToken(signingKey: key, dpopJWK: jwk)
+        let proof = try signedDPoP(
+            signingKey: key,
+            jwk: jwk,
+            htm: "GET",
+            htu: "https://api.testing.latr.link/v1/latr/og-preview",
+            accessToken: token
+        )
+
+        XCTAssertNoThrow(
+            try verifyGatewayDPoP(
+                proof: proof,
+                accessToken: token,
+                request: request(
+                    path: "/v1/latr/og-preview?url=https%3A%2F%2Fexample.com",
+                    scheme: nil,
+                    authority: "api.testing.latr.link"
+                )
+            )
+        )
+    }
+
     func testOAuthVerifierRejectsTamperedAccessTokenSignature() async throws {
         let key = P256.Signing.PrivateKey()
         let jwk = jwk(for: key.publicKey)

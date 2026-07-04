@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { OAuthSession } from "@atproto/oauth-client-browser";
 import {
   LATR_GATEWAY_MIGRATE_LEXICONS_PATH,
@@ -7,6 +7,8 @@ import {
 
 import { configureLatrGateway } from "./latrGatewayConfig";
 import { latrGatewayFetch } from "./latrGatewayClient";
+
+const ORIGINAL_FETCH = globalThis.fetch;
 
 beforeEach(() => {
   configureLatrGateway({
@@ -19,8 +21,13 @@ beforeEach(() => {
   });
 });
 
+afterEach(() => {
+  globalThis.fetch = ORIGINAL_FETCH;
+});
+
 function mockOAuthSession(
-  handler: (url: string, init?: RequestInit) => Promise<Response>
+  handler: (url: string, init?: RequestInit) => Promise<Response>,
+  onJwtClaims?: (claims: Record<string, string | number>) => void
 ): OAuthSession {
   let proofCount = 0;
 
@@ -44,8 +51,9 @@ function mockOAuthSession(
       dpopKey: {
         bareJwk: { kty: "EC", crv: "P-256", x: "x", y: "y" },
         algorithms: ["ES256"],
-        createJwt: async () => {
+        createJwt: async (_header: unknown, claims: Record<string, string | number>) => {
           proofCount += 1;
+          onJwtClaims?.(claims);
           return `proof-${proofCount}`;
         },
       },
@@ -60,13 +68,20 @@ describe("latrGatewayFetch upstream proofs", () => {
   test("GET /v1/latr/saves sends list-only upstream proofs", async () => {
     let upstreamHeader = "";
 
-    const oauth = mockOAuthSession(async (_url, init) => {
+    globalThis.fetch = (async (_url, init) => {
       upstreamHeader = String(
         new Headers(init?.headers).get(LATR_UPSTREAM_DPOP_HEADER) ?? ""
       );
       return new Response(JSON.stringify({ records: [] }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    const oauth = mockOAuthSession(async () => {
+      return new Response(JSON.stringify({ error: "Use DPoP nonce" }), {
+        status: 400,
+        headers: { "DPoP-Nonce": "fresh-pds-nonce" },
       });
     });
 
@@ -78,7 +93,7 @@ describe("latrGatewayFetch upstream proofs", () => {
   test("POST /v1/latr/migrate-lexicons sends migration upstream proofs", async () => {
     let upstreamHeader = "";
 
-    const oauth = mockOAuthSession(async (_url, init) => {
+    globalThis.fetch = (async (_url, init) => {
       upstreamHeader = String(
         new Headers(init?.headers).get(LATR_UPSTREAM_DPOP_HEADER) ?? ""
       );
@@ -95,6 +110,13 @@ describe("latrGatewayFetch upstream proofs", () => {
           headers: { "Content-Type": "application/json" },
         }
       );
+    }) as typeof fetch;
+
+    const oauth = mockOAuthSession(async () => {
+      return new Response(JSON.stringify({ error: "Use DPoP nonce" }), {
+        status: 400,
+        headers: { "DPoP-Nonce": "fresh-pds-nonce" },
+      });
     });
 
     await latrGatewayFetch(oauth, LATR_GATEWAY_MIGRATE_LEXICONS_PATH, {
@@ -107,13 +129,20 @@ describe("latrGatewayFetch upstream proofs", () => {
   test("POST /v1/latr/saves sends save upstream proofs", async () => {
     let upstreamHeader = "";
 
-    const oauth = mockOAuthSession(async (_url, init) => {
+    globalThis.fetch = (async (_url, init) => {
       upstreamHeader = String(
         new Headers(init?.headers).get(LATR_UPSTREAM_DPOP_HEADER) ?? ""
       );
       return new Response(JSON.stringify({ ok: true, kind: "url" }), {
         status: 201,
         headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    const oauth = mockOAuthSession(async () => {
+      return new Response(JSON.stringify({ error: "Use DPoP nonce" }), {
+        status: 400,
+        headers: { "DPoP-Nonce": "fresh-pds-nonce" },
       });
     });
 
@@ -124,5 +153,41 @@ describe("latrGatewayFetch upstream proofs", () => {
     });
 
     expect(upstreamHeader.split(",")).toHaveLength(8);
+  });
+
+  test("sends explicit gateway Authorization and DPoP headers", async () => {
+    let authorization = "";
+    let dpop = "";
+    const claimsSeen: Record<string, string | number>[] = [];
+
+    globalThis.fetch = (async (_url, init) => {
+      const headers = new Headers(init?.headers);
+      authorization = headers.get("Authorization") ?? "";
+      dpop = headers.get("DPoP") ?? "";
+      return new Response(JSON.stringify({ records: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    const oauth = mockOAuthSession(
+      async () =>
+        new Response(JSON.stringify({ error: "Use DPoP nonce" }), {
+          status: 400,
+          headers: { "DPoP-Nonce": "fresh-pds-nonce" },
+        }),
+      (claims) => claimsSeen.push(claims)
+    );
+
+    await latrGatewayFetch(oauth, "/v1/latr/og-preview?url=https://example.com", {
+      method: "GET",
+    });
+
+    expect(authorization).toBe("DPoP test-access-token");
+    expect(dpop).toBe("proof-1");
+    expect(claimsSeen[0]).toMatchObject({
+      htm: "GET",
+      htu: "http://127.0.0.1:8080/v1/latr/og-preview",
+    });
   });
 });
