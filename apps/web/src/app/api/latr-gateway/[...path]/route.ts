@@ -42,6 +42,11 @@ const RESPONSE_HEADERS_TO_DROP = new Set([
 
 type RequestWithOptionalNextUrl = Request & { nextUrl?: URL };
 
+type ProxyForwardingDiagnostics = {
+  userAuthorizationSource: "custom" | "direct" | "missing";
+  userDpopSource: "custom" | "direct" | "missing";
+};
+
 function firstForwardedHeader(req: Request, name: string): string | undefined {
   return req.headers.get(name)?.split(",")[0]?.trim() || undefined;
 }
@@ -120,7 +125,18 @@ function hasGatewayCredentialHeaders(headers: Headers): boolean {
   );
 }
 
-function forwardedRequestHeaders(req: Request): Headers {
+function firstHeaderValue(req: Request, names: string[]): string | undefined {
+  for (const name of names) {
+    const value = req.headers.get(name)?.trim();
+    if (value) return value;
+  }
+  return undefined;
+}
+
+function forwardedRequestHeaders(req: Request): {
+  headers: Headers;
+  diagnostics: ProxyForwardingDiagnostics;
+} {
   const headers = new Headers();
   const url = requestUrl(req);
   for (const [name, value] of req.headers) {
@@ -129,16 +145,24 @@ function forwardedRequestHeaders(req: Request): Headers {
     }
   }
 
-  const proxiedAuthorization = headers.get(LATR_PROXY_USER_AUTHORIZATION_HEADER);
+  const proxiedAuthorization = firstHeaderValue(req, [
+    LATR_PROXY_USER_AUTHORIZATION_HEADER,
+    LATR_PROXY_USER_AUTHORIZATION_HEADER.toLowerCase(),
+  ]);
   if (proxiedAuthorization) {
-    headers.set("Authorization", proxiedAuthorization);
+    headers.set("authorization", proxiedAuthorization);
     headers.delete(LATR_PROXY_USER_AUTHORIZATION_HEADER);
+    headers.delete(LATR_PROXY_USER_AUTHORIZATION_HEADER.toLowerCase());
   }
 
-  const proxiedDpop = headers.get(LATR_PROXY_USER_DPOP_HEADER);
+  const proxiedDpop = firstHeaderValue(req, [
+    LATR_PROXY_USER_DPOP_HEADER,
+    LATR_PROXY_USER_DPOP_HEADER.toLowerCase(),
+  ]);
   if (proxiedDpop) {
-    headers.set("DPoP", proxiedDpop);
+    headers.set("dpop", proxiedDpop);
     headers.delete(LATR_PROXY_USER_DPOP_HEADER);
+    headers.delete(LATR_PROXY_USER_DPOP_HEADER.toLowerCase());
   }
 
   headers.set("X-Forwarded-Host", forwardedHost(req));
@@ -151,7 +175,21 @@ function forwardedRequestHeaders(req: Request): Headers {
   for (const [name, value] of gatewayCredentialHeaders()) {
     headers.set(name, value);
   }
-  return headers;
+  return {
+    headers,
+    diagnostics: {
+      userAuthorizationSource: proxiedAuthorization
+        ? "custom"
+        : headers.get("authorization")
+          ? "direct"
+          : "missing",
+      userDpopSource: proxiedDpop
+        ? "custom"
+        : headers.get("dpop")
+          ? "direct"
+          : "missing",
+    },
+  };
 }
 
 async function proxyLatrGateway(req: Request): Promise<Response> {
@@ -159,7 +197,7 @@ async function proxyLatrGateway(req: Request): Promise<Response> {
   const path = url.pathname.slice(LATR_GATEWAY_PROXY_BASE_PATH.length);
   const gatewayBase = serverGatewayBaseUrl(req);
   const target = `${gatewayBase}${path}${url.search}`;
-  const requestHeaders = forwardedRequestHeaders(req);
+  const { headers: requestHeaders, diagnostics } = forwardedRequestHeaders(req);
   if (
     !isLoopbackGatewayUrl(gatewayBase) &&
     !hasGatewayCredentialHeaders(requestHeaders)
@@ -191,6 +229,21 @@ async function proxyLatrGateway(req: Request): Promise<Response> {
     }
   }
   responseHeaders.set("Cache-Control", "no-store");
+  if (!upstream.ok) {
+    responseHeaders.set(
+      "X-Latr-Proxy-User-Authorization",
+      diagnostics.userAuthorizationSource
+    );
+    responseHeaders.set("X-Latr-Proxy-User-DPoP", diagnostics.userDpopSource);
+    responseHeaders.set(
+      "X-Latr-Proxy-Upstream-Authorization",
+      requestHeaders.get("authorization") ? "present" : "missing"
+    );
+    responseHeaders.set(
+      "X-Latr-Proxy-Upstream-DPoP",
+      requestHeaders.get("dpop") ? "present" : "missing"
+    );
+  }
 
   return new NextResponse(upstream.body, {
     status: upstream.status,

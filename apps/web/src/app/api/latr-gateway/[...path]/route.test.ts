@@ -35,14 +35,17 @@ describe("/api/latr-gateway proxy", () => {
 
     let target = "";
     let headers = new Headers();
-    globalThis.fetch = (async (url, init) => {
+    globalThis.fetch = (async (
+      url: Parameters<typeof fetch>[0],
+      init?: Parameters<typeof fetch>[1]
+    ) => {
       target = String(url);
       headers = new Headers(init?.headers);
       return new Response(JSON.stringify({ records: [] }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
-    }) as typeof fetch;
+    }) as unknown as typeof fetch;
 
     const req = new Request(
       "https://testing.latr.link/api/latr-gateway/v1/latr/saves?limit=10",
@@ -82,14 +85,17 @@ describe("/api/latr-gateway proxy", () => {
 
     let body = "";
     let headers = new Headers();
-    globalThis.fetch = (async (_url, init) => {
+    globalThis.fetch = (async (
+      _url: Parameters<typeof fetch>[0],
+      init?: Parameters<typeof fetch>[1]
+    ) => {
       headers = new Headers(init?.headers);
       body = await new Response(init?.body).text();
       return new Response(JSON.stringify({ ok: true }), {
         status: 201,
         headers: { "Content-Type": "application/json" },
       });
-    }) as typeof fetch;
+    }) as unknown as typeof fetch;
 
     const req = new Request(
       "https://testing.latr.link/api/latr-gateway/v1/latr/saves",
@@ -141,6 +147,45 @@ describe("/api/latr-gateway proxy", () => {
     expect(res.status).toBe(500);
     expect(body.error).toBe("gateway_client_credentials_unconfigured");
     expect(didFetch).toBe(false);
+  });
+
+  test("Adds Forwarding Diagnostics When Upstream Rejects Auth", async () => {
+    process.env.LATR_GATEWAY_CLIENT_ID = "latr-link-web";
+    process.env.LATR_GATEWAY_API_KEY = "lk_server";
+    process.env.NEXT_PUBLIC_LATR_GATEWAY_URL = "https://api.testing.latr.link";
+
+    globalThis.fetch = (async () => {
+      return new Response(
+        JSON.stringify({
+          error: "missing_auth",
+          message: "Missing Authorization header",
+        }),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }) as unknown as typeof fetch;
+
+    const req = new Request(
+      "https://testing.latr.link/api/latr-gateway/v1/latr/saves",
+      {
+        headers: {
+          "x-latr-user-authorization": "DPoP access",
+          "x-latr-user-dpop": "gateway-proof",
+          "X-Forwarded-Host": "testing.latr.link",
+          "X-Forwarded-Proto": "https",
+        },
+      }
+    );
+
+    const res = await GET(req);
+
+    expect(res.status).toBe(401);
+    expect(res.headers.get("X-Latr-Proxy-User-Authorization")).toBe("custom");
+    expect(res.headers.get("X-Latr-Proxy-User-DPoP")).toBe("custom");
+    expect(res.headers.get("X-Latr-Proxy-Upstream-Authorization")).toBe("present");
+    expect(res.headers.get("X-Latr-Proxy-Upstream-DPoP")).toBe("present");
   });
 
   test("Allows Local Loopback Gateway Without Server Credentials", async () => {
