@@ -128,7 +128,7 @@ public func authenticateRequest(
     let dpopJWK = try verifyGatewayDPoP(proof: dpop, accessToken: accessToken, request: request)
 
     let payload: JWTPayload
-    if config.oauthVerifyTokenSignature, let httpClient {
+    if let httpClient {
         payload = try await OAuthTokenVerifier(httpClient: httpClient)
             .verify(accessToken: accessToken, dpopJWK: dpopJWK)
             .payload
