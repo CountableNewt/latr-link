@@ -53,7 +53,11 @@ function readWindowGatewayBootstrap(): LatrGatewayWindowBootstrap | undefined {
 
 export function browserLatrGatewayProxyBaseUrl(): string | undefined {
   if (typeof window === "undefined") return undefined;
-  return `${window.location.origin}${LATR_GATEWAY_PROXY_BASE_PATH}`;
+  return latrGatewayProxyBaseUrlForOrigin(window.location.origin);
+}
+
+export function latrGatewayProxyBaseUrlForOrigin(origin: string): string {
+  return `${origin}${LATR_GATEWAY_PROXY_BASE_PATH}`;
 }
 
 /** Push web env + current browser hostname into shared `latr-web-client` config. */

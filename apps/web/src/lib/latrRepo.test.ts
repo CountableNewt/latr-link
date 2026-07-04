@@ -4,8 +4,28 @@ import { configureLatrGateway } from "latr-web-client/latrGatewayConfig";
 import { LatrRepo } from "latr-web-client/latrRepo";
 
 const ORIGINAL_FETCH = globalThis.fetch;
+const ORIGINAL_WINDOW = globalThis.window;
+const ORIGINAL_ENV = {
+  NEXT_PUBLIC_APP_ENV: process.env.NEXT_PUBLIC_APP_ENV,
+  APP_ENV: process.env.APP_ENV,
+  NEXT_PUBLIC_LATR_GATEWAY_URL: process.env.NEXT_PUBLIC_LATR_GATEWAY_URL,
+};
+
+function restoreEnv(): void {
+  for (const [key, value] of Object.entries(ORIGINAL_ENV)) {
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+}
 
 beforeEach(() => {
+  globalThis.window = ORIGINAL_WINDOW;
+  process.env.NEXT_PUBLIC_APP_ENV = "local";
+  delete process.env.APP_ENV;
+  delete process.env.NEXT_PUBLIC_LATR_GATEWAY_URL;
   configureLatrGateway({
     appEnv: "local",
     gatewayUrl: "http://127.0.0.1:8080",
@@ -18,6 +38,8 @@ beforeEach(() => {
 
 afterEach(() => {
   globalThis.fetch = ORIGINAL_FETCH;
+  globalThis.window = ORIGINAL_WINDOW;
+  restoreEnv();
 });
 
 function mockOAuthSession(
