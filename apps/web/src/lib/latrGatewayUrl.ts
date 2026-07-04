@@ -6,7 +6,6 @@ import {
   LOCAL_LATR_GATEWAY_URL,
   latrGatewayBaseUrl as sharedLatrGatewayBaseUrl,
   publishLatrGatewayWindowBootstrap,
-  registerLatrGatewayConfigSync,
   type LatrGatewayWindowBootstrap,
 } from "latr-web-client/latrGatewayConfig";
 
@@ -96,8 +95,6 @@ export function syncLatrGatewayFromBrowser(): void {
     appEnv,
   });
 }
-
-registerLatrGatewayConfigSync(syncLatrGatewayFromBrowser);
 
 function syncLatrGatewayFromProcessEnv(): void {
   configureLatrGateway({
