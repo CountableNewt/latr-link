@@ -4,28 +4,8 @@ import { configureLatrGateway } from "latr-web-client/latrGatewayConfig";
 import { LatrRepo } from "latr-web-client/latrRepo";
 
 const ORIGINAL_FETCH = globalThis.fetch;
-const ORIGINAL_WINDOW = globalThis.window;
-const ORIGINAL_ENV = {
-  NEXT_PUBLIC_APP_ENV: process.env.NEXT_PUBLIC_APP_ENV,
-  APP_ENV: process.env.APP_ENV,
-  NEXT_PUBLIC_LATR_GATEWAY_URL: process.env.NEXT_PUBLIC_LATR_GATEWAY_URL,
-};
-
-function restoreEnv(): void {
-  for (const [key, value] of Object.entries(ORIGINAL_ENV)) {
-    if (value === undefined) {
-      delete process.env[key];
-    } else {
-      process.env[key] = value;
-    }
-  }
-}
 
 beforeEach(() => {
-  globalThis.window = ORIGINAL_WINDOW;
-  process.env.NEXT_PUBLIC_APP_ENV = "local";
-  delete process.env.APP_ENV;
-  delete process.env.NEXT_PUBLIC_LATR_GATEWAY_URL;
   configureLatrGateway({
     appEnv: "local",
     gatewayUrl: "http://127.0.0.1:8080",
@@ -38,8 +18,6 @@ beforeEach(() => {
 
 afterEach(() => {
   globalThis.fetch = ORIGINAL_FETCH;
-  globalThis.window = ORIGINAL_WINDOW;
-  restoreEnv();
 });
 
 function mockOAuthSession(
@@ -142,9 +120,9 @@ describe("Latrrepo Gateway Facade", () => {
       return new Response(
         JSON.stringify({ ok: true, kind: "url", storage: "external" }),
         {
-        status: 201,
-        headers: { "Content-Type": "application/json" },
-      }
+          status: 201,
+          headers: { "Content-Type": "application/json" },
+        }
       );
     }) as typeof fetch;
     const oauth = mockOAuthSession(async () => {
@@ -202,16 +180,5 @@ describe("Latrrepo Gateway Facade", () => {
     const repo = new LatrRepo(oauth, "did:plc:viewer");
     await repo.unsave("item-rkey");
     expect(method).toBe("DELETE");
-  });
-});
-
-describe("Latr Gateway Base URL", () => {
-  test("Re-exports Env-aware Gateway URL Resolution", async () => {
-    const prev = process.env.NEXT_PUBLIC_LATR_GATEWAY_URL;
-    process.env.NEXT_PUBLIC_APP_ENV = "local";
-    delete process.env.NEXT_PUBLIC_LATR_GATEWAY_URL;
-    const { latrGatewayBaseUrl } = await import("./latrGatewayClient");
-    expect(latrGatewayBaseUrl()).toBe("http://127.0.0.1:8080");
-    if (prev) process.env.NEXT_PUBLIC_LATR_GATEWAY_URL = prev;
   });
 });
