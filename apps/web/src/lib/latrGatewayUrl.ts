@@ -51,8 +51,12 @@ function readWindowGatewayBootstrap(): LatrGatewayWindowBootstrap | undefined {
   return window.__LATR_GATEWAY_BOOTSTRAP__;
 }
 
+function isBrowserRuntime(): boolean {
+  return typeof window !== "undefined" && typeof document !== "undefined";
+}
+
 export function browserLatrGatewayProxyBaseUrl(): string | undefined {
-  if (typeof window === "undefined") return undefined;
+  if (!isBrowserRuntime()) return undefined;
   return latrGatewayProxyBaseUrlForOrigin(window.location.origin);
 }
 
@@ -62,13 +66,13 @@ export function latrGatewayProxyBaseUrlForOrigin(origin: string): string {
 
 /** Push web env + current browser hostname into shared `latr-web-client` config. */
 export function syncLatrGatewayFromBrowser(): void {
+  if (!isBrowserRuntime()) return;
+
   let testingHostname: string | undefined;
-  if (typeof window !== "undefined") {
-    try {
-      testingHostname = new URL(window.location.href).hostname;
-    } catch {
-      //
-    }
+  try {
+    testingHostname = new URL(window.location.href).hostname;
+  } catch {
+    //
   }
 
   const bootstrap = readWindowGatewayBootstrap();
@@ -95,12 +99,27 @@ export function syncLatrGatewayFromBrowser(): void {
 
 registerLatrGatewayConfigSync(syncLatrGatewayFromBrowser);
 
+function syncLatrGatewayFromProcessEnv(): void {
+  configureLatrGateway({
+    gatewayUrl: process.env.NEXT_PUBLIC_LATR_GATEWAY_URL?.trim() ?? "",
+    appEnv: toLatrGatewayAppEnv(),
+    testingHostname: "",
+    clientCredential: "",
+    clientId: "",
+    apiKey: "",
+  });
+}
+
 /**
  * Base URL for `services/latr-gateway` API calls.
  * Hostname mapping wins over loopback overrides; non-loopback explicit URL wins otherwise.
  */
 export function latrGatewayBaseUrl(): string {
-  syncLatrGatewayFromBrowser();
+  if (isBrowserRuntime()) {
+    syncLatrGatewayFromBrowser();
+  } else {
+    syncLatrGatewayFromProcessEnv();
+  }
   return sharedLatrGatewayBaseUrl();
 }
 
