@@ -13,8 +13,6 @@ import {
 import "./globals.css";
 import {
   buildGatewayWindowBootstrap,
-  readGatewayClientCredentialFromEnv,
-  readGatewayClientCredentialsFromEnv,
 } from "@/lib/latrGatewayUrl";
 import { Providers } from "./providers";
 
@@ -65,8 +63,6 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const appEnv = getAppEnv();
-  const gatewayClientCredential = readGatewayClientCredentialFromEnv();
-  const gatewayClientCredentials = readGatewayClientCredentialsFromEnv();
   const gatewayBootstrap = buildGatewayWindowBootstrap(toLatrGatewayAppEnv(appEnv));
   const bodyStyle = {
     "--env-banner-offset": environmentBannerOffset(appEnv),
@@ -85,11 +81,7 @@ export default function RootLayout({
         <Script id="latr-gateway-bootstrap" strategy="beforeInteractive">
           {`window.__LATR_GATEWAY_BOOTSTRAP__=${JSON.stringify(gatewayBootstrap)};`}
         </Script>
-        <Providers
-          gatewayClientCredential={gatewayClientCredential}
-          gatewayClientId={gatewayClientCredentials.clientId}
-          gatewayApiKey={gatewayClientCredentials.apiKey}
-        >
+        <Providers>
           <EnvironmentBanner appEnv={appEnv} />
           {children}
         </Providers>

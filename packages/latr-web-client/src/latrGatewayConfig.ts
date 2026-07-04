@@ -144,6 +144,19 @@ function isLoopbackGatewayUrl(url: string): boolean {
   }
 }
 
+function isSameOriginGatewayProxyUrl(url: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const parsed = new URL(url);
+    return (
+      parsed.origin === window.location.origin &&
+      parsed.pathname.replace(/\/$/, "") === "/api/latr-gateway"
+    );
+  } catch {
+    return false;
+  }
+}
+
 /** Known hosted web origins → gateway API base when env vars are misconfigured. */
 function gatewayForKnownHostname(hostname: string | undefined): string | undefined {
   switch (hostname?.toLowerCase()) {
@@ -216,6 +229,7 @@ export function assertLatrGatewayClientCredential(
   if (headers[LATR_OFFICIAL_CLIENT_HEADER]) return;
   const base = latrGatewayBaseUrl(resolved);
   if (isLoopbackGatewayUrl(base)) return;
+  if (isSameOriginGatewayProxyUrl(base)) return;
 
   const bootstrap = readWindowGatewayBootstrap();
   const bootstrapClientId = Boolean(bootstrap?.clientId?.trim());

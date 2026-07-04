@@ -128,7 +128,7 @@ Full template: [`services/latr-gateway/.env.example`](../../services/latr-gatewa
 | `LATR_GATEWAY_DEVELOPER_STORE_PATH` | No | `./data/developer-store.json` | JSON fallback when `DATABASE_URL` is unset (local dev) |
 | `LATR_GATEWAY_CLIENT_REGISTRY_PATH` | No | `./data/client-registry.json` | Legacy JSON registry (deprecated) |
 
-**L@tr web** — `LATR_GATEWAY_CLIENT_CREDENTIAL` or split `LATR_GATEWAY_CLIENT_ID` + `LATR_GATEWAY_API_KEY` via `next.config.ts`.
+**L@tr web** — `LATR_GATEWAY_CLIENT_CREDENTIAL` or split `LATR_GATEWAY_CLIENT_ID` + `LATR_GATEWAY_API_KEY` are server-only secrets. Browser calls go to the same-origin Next.js proxy at `/api/latr-gateway/*`; the proxy forwards OAuth/DPoP headers and injects gateway client credentials server-side.
 
 **The Social Wire** — `NEXT_PUBLIC_LATR_GATEWAY_CLIENT_ID` + `NEXT_PUBLIC_LATR_GATEWAY_API_KEY` (preferred) or legacy `NEXT_PUBLIC_LATR_GATEWAY_CLIENT_CREDENTIAL`.
 

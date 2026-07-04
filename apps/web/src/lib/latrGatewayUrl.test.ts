@@ -2,11 +2,17 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { configureLatrGateway } from "latr-web-client/latrGatewayConfig";
 
 import {
+  LATR_GATEWAY_PROXY_BASE_PATH,
   DEFAULT_DEV_LATR_GATEWAY_URL,
   DEFAULT_PROD_LATR_GATEWAY_URL,
   LOCAL_LATR_GATEWAY_URL,
   latrGatewayBaseUrl,
+  syncLatrGatewayFromBrowser,
 } from "@/lib/latrGatewayUrl";
+import {
+  assertLatrGatewayClientCredential,
+  latrGatewayClientHeaders,
+} from "latr-web-client/latrGatewayConfig";
 
 const originalEnv = {
   NEXT_PUBLIC_APP_ENV: process.env.NEXT_PUBLIC_APP_ENV,
@@ -63,5 +69,29 @@ describe("Latr Gateway Base URL", () => {
   test("Honors Explicit NEXT_PUBLIC_LATR_GATEWAY_URL", () => {
     process.env.NEXT_PUBLIC_LATR_GATEWAY_URL = "https://custom.gateway.example/";
     expect(latrGatewayBaseUrl()).toBe("https://custom.gateway.example");
+  });
+
+  test("Browser Runtime Uses Same-origin Proxy Without Client Credential Headers", () => {
+    const previousWindow = globalThis.window;
+    globalThis.window = {
+      location: {
+        href: "https://testing.latr.link/library",
+        origin: "https://testing.latr.link",
+      },
+      __LATR_GATEWAY_BOOTSTRAP__: {
+        appEnv: "dev",
+      },
+    } as Window & typeof globalThis;
+
+    try {
+      syncLatrGatewayFromBrowser();
+      expect(latrGatewayBaseUrl()).toBe(
+        `https://testing.latr.link${LATR_GATEWAY_PROXY_BASE_PATH}`
+      );
+      expect(latrGatewayClientHeaders()).toEqual({});
+      expect(() => assertLatrGatewayClientCredential()).not.toThrow();
+    } finally {
+      globalThis.window = previousWindow;
+    }
   });
 });
