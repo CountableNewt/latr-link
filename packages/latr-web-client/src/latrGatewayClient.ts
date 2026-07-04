@@ -25,6 +25,72 @@ export type LatrGatewayFetchOptions = {
   skipClientCredential?: boolean;
 };
 
+type TokenSet = {
+  access_token: string;
+  token_type?: string;
+};
+
+type SessionWithTokenSet = OAuthSession & {
+  getTokenSet(refresh: boolean | "auto"): Promise<TokenSet>;
+};
+
+function stripQueryAndFragment(url: string): string {
+  const fragmentIndex = url.indexOf("#");
+  const queryIndex = url.indexOf("?");
+  if (fragmentIndex === -1 && queryIndex === -1) return url;
+  if (fragmentIndex === -1) return url.slice(0, queryIndex);
+  if (queryIndex === -1) return url.slice(0, fragmentIndex);
+  return url.slice(0, Math.min(fragmentIndex, queryIndex));
+}
+
+async function sha256Base64Url(input: string): Promise<string> {
+  const bytes = new TextEncoder().encode(input);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const view = new Uint8Array(digest);
+  let binary = "";
+  for (const byte of view) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+async function buildGatewayUserAuthHeaders(
+  oauthSession: OAuthSession,
+  method: string,
+  gatewayUrl: string,
+  tokenSet: TokenSet
+): Promise<Record<string, string>> {
+  const key = oauthSession.server.dpopKey;
+  const jwk = key.bareJwk;
+  if (!jwk) {
+    throw new Error("OAuth session DPoP key is unavailable");
+  }
+
+  const supported =
+    oauthSession.server.serverMetadata.dpop_signing_alg_values_supported;
+  const alg =
+    supported?.find((candidate) => key.algorithms.includes(candidate)) ??
+    key.algorithms[0];
+  if (!alg) {
+    throw new Error("OAuth session DPoP key has no supported algorithm");
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const claims: Record<string, string | number> = {
+    iat: now,
+    jti: Math.random().toString(36).slice(2),
+    htm: method.toUpperCase(),
+    htu: stripQueryAndFragment(gatewayUrl),
+    ath: await sha256Base64Url(tokenSet.access_token),
+  };
+  const dpop = await key.createJwt({ alg, typ: "dpop+jwt", jwk }, claims);
+
+  return {
+    Authorization: `${tokenSet.token_type ?? "DPoP"} ${tokenSet.access_token}`,
+    DPoP: dpop,
+  };
+}
+
 /** Upstream proofs for GET /v1/latr/saves (paginated listRecords only). */
 export async function createListSavesUpstreamDpopProofPool(
   oauthSession: OAuthSession,
@@ -85,11 +151,15 @@ export async function latrGatewayFetch(
 
   const upstream = pdsXrpcMethodForGatewayRequest(method, gatewayPath);
   const upstreamHeaders: Record<string, string> = {};
-  const sessionWithTokenSet = oauthSession as OAuthSession & {
-    getTokenSet(refresh: boolean | "auto"): Promise<{ access_token: string }>;
-  };
+  const sessionWithTokenSet = oauthSession as SessionWithTokenSet;
   const tokenSet = await sessionWithTokenSet.getTokenSet("auto");
   const proofOptions = { accessToken: tokenSet.access_token };
+  const userAuthHeaders = await buildGatewayUserAuthHeaders(
+    oauthSession,
+    method,
+    url,
+    tokenSet
+  );
 
   if (method === "POST" && gatewayPath === LATR_GATEWAY_SAVES_PATH) {
     upstreamHeaders[LATR_UPSTREAM_DPOP_HEADER] =
@@ -109,11 +179,12 @@ export async function latrGatewayFetch(
     );
   }
 
-  return oauthSession.fetchHandler(url, {
+  return fetch(url, {
     ...init,
     headers: {
       Accept: "application/json",
       ...clientHeaders,
+      ...userAuthHeaders,
       ...upstreamHeaders,
       ...(init?.headers ?? {}),
     },

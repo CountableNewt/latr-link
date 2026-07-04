@@ -197,6 +197,7 @@ private func normalizeDPoPURL(_ raw: String) -> String? {
     }
     components.scheme = scheme
     components.host = host
+    components.query = nil
     components.fragment = nil
     if (scheme == "https" && components.port == 443) || (scheme == "http" && components.port == 80) {
         components.port = nil
