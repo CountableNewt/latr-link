@@ -6,7 +6,11 @@ import {
 } from "latr-packages/gateway-client";
 
 import { configureLatrGateway } from "./latrGatewayConfig";
-import { latrGatewayFetch } from "./latrGatewayClient";
+import {
+  LATR_PROXY_USER_AUTHORIZATION_HEADER,
+  LATR_PROXY_USER_DPOP_HEADER,
+  latrGatewayFetch,
+} from "./latrGatewayClient";
 
 const ORIGINAL_FETCH = globalThis.fetch;
 
@@ -23,6 +27,9 @@ beforeEach(() => {
 
 afterEach(() => {
   globalThis.fetch = ORIGINAL_FETCH;
+  if (typeof window !== "undefined") {
+    delete window.__LATR_GATEWAY_BOOTSTRAP__;
+  }
 });
 
 function mockOAuthSession(
@@ -189,5 +196,58 @@ describe("latrGatewayFetch upstream proofs", () => {
       htm: "GET",
       htu: "http://127.0.0.1:8080/v1/latr/og-preview",
     });
+  });
+
+  test("uses proxy user auth headers for same-origin web gateway proxy", async () => {
+    const previousWindow = globalThis.window;
+    globalThis.window = {
+      location: {
+        origin: "https://testing.latr.link",
+      },
+    } as Window & typeof globalThis;
+    configureLatrGateway({
+      appEnv: "dev",
+      gatewayUrl: "https://testing.latr.link/api/latr-gateway",
+      testingHostname: "testing.latr.link",
+      clientCredential: "",
+      clientId: "",
+      apiKey: "",
+    });
+
+    let authorization = "";
+    let dpop = "";
+    let proxyAuthorization = "";
+    let proxyDpop = "";
+
+    globalThis.fetch = (async (_url, init) => {
+      const headers = new Headers(init?.headers);
+      authorization = headers.get("Authorization") ?? "";
+      dpop = headers.get("DPoP") ?? "";
+      proxyAuthorization =
+        headers.get(LATR_PROXY_USER_AUTHORIZATION_HEADER) ?? "";
+      proxyDpop = headers.get(LATR_PROXY_USER_DPOP_HEADER) ?? "";
+      return new Response(JSON.stringify({ records: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    const oauth = mockOAuthSession(async () => {
+      return new Response(JSON.stringify({ error: "Use DPoP nonce" }), {
+        status: 400,
+        headers: { "DPoP-Nonce": "fresh-pds-nonce" },
+      });
+    });
+
+    try {
+      await latrGatewayFetch(oauth, "/v1/latr/saves", { method: "GET" });
+    } finally {
+      globalThis.window = previousWindow;
+    }
+
+    expect(authorization).toBe("");
+    expect(dpop).toBe("");
+    expect(proxyAuthorization).toBe("DPoP test-access-token");
+    expect(proxyDpop).toBe("proof-1");
   });
 });

@@ -49,8 +49,8 @@ describe("/api/latr-gateway proxy", () => {
       {
         headers: {
           Accept: "application/json",
-          Authorization: "DPoP access",
-          DPoP: "gateway-proof",
+          "X-Latr-User-Authorization": "DPoP access",
+          "X-Latr-User-DPoP": "gateway-proof",
           "X-ATProto-Upstream-DPoP": "upstream-proof",
           "X-Latr-Client-Id": "browser-client",
           "X-Latr-API-Key": "lk_browser",
@@ -69,6 +69,8 @@ describe("/api/latr-gateway proxy", () => {
     expect(headers.get("X-ATProto-Upstream-DPoP")).toBe("upstream-proof");
     expect(headers.get("X-Latr-Client-Id")).toBe("latr-link-web");
     expect(headers.get("X-Latr-API-Key")).toBe("lk_server");
+    expect(headers.get("X-Latr-User-Authorization")).toBeNull();
+    expect(headers.get("X-Latr-User-DPoP")).toBeNull();
     expect(headers.get("X-Original-URI")).toBe(
       "/api/latr-gateway/v1/latr/saves?limit=10"
     );

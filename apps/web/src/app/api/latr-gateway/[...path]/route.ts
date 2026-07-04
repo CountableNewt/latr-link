@@ -13,6 +13,10 @@ import {
   LATR_CLIENT_ID_HEADER,
   LATR_OFFICIAL_CLIENT_HEADER,
 } from "latr-web-client/latrGatewayConfig";
+import {
+  LATR_PROXY_USER_AUTHORIZATION_HEADER,
+  LATR_PROXY_USER_DPOP_HEADER,
+} from "latr-web-client/latrGatewayClient";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,6 +27,8 @@ const FORWARDED_REQUEST_HEADERS = new Set([
   "content-type",
   "dpop",
   "x-atproto-upstream-dpop",
+  "x-latr-user-authorization",
+  "x-latr-user-dpop",
 ]);
 
 const RESPONSE_HEADERS_TO_DROP = new Set([
@@ -121,6 +127,18 @@ function forwardedRequestHeaders(req: Request): Headers {
     if (FORWARDED_REQUEST_HEADERS.has(name.toLowerCase())) {
       headers.set(name, value);
     }
+  }
+
+  const proxiedAuthorization = headers.get(LATR_PROXY_USER_AUTHORIZATION_HEADER);
+  if (proxiedAuthorization) {
+    headers.set("Authorization", proxiedAuthorization);
+    headers.delete(LATR_PROXY_USER_AUTHORIZATION_HEADER);
+  }
+
+  const proxiedDpop = headers.get(LATR_PROXY_USER_DPOP_HEADER);
+  if (proxiedDpop) {
+    headers.set("DPoP", proxiedDpop);
+    headers.delete(LATR_PROXY_USER_DPOP_HEADER);
   }
 
   headers.set("X-Forwarded-Host", forwardedHost(req));

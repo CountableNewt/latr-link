@@ -20,6 +20,9 @@ import {
 
 export { LATR_OFFICIAL_CLIENT_HEADER, LATR_UPSTREAM_DPOP_HEADER };
 
+export const LATR_PROXY_USER_AUTHORIZATION_HEADER = "X-Latr-User-Authorization";
+export const LATR_PROXY_USER_DPOP_HEADER = "X-Latr-User-DPoP";
+
 export type LatrGatewayFetchOptions = {
   /** Developer console management routes use OAuth only (no app API key). */
   skipClientCredential?: boolean;
@@ -88,6 +91,31 @@ async function buildGatewayUserAuthHeaders(
   return {
     Authorization: `${tokenSet.token_type ?? "DPoP"} ${tokenSet.access_token}`,
     DPoP: dpop,
+  };
+}
+
+function isSameOriginGatewayProxyUrl(url: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const parsed = new URL(url);
+    return (
+      parsed.origin === window.location.origin &&
+      parsed.pathname.startsWith("/api/latr-gateway/")
+    );
+  } catch {
+    return false;
+  }
+}
+
+function headersForGatewayHop(
+  url: string,
+  userAuthHeaders: Record<string, string>
+): Record<string, string> {
+  if (!isSameOriginGatewayProxyUrl(url)) return userAuthHeaders;
+
+  return {
+    [LATR_PROXY_USER_AUTHORIZATION_HEADER]: userAuthHeaders.Authorization,
+    [LATR_PROXY_USER_DPOP_HEADER]: userAuthHeaders.DPoP,
   };
 }
 
@@ -160,6 +188,7 @@ export async function latrGatewayFetch(
     url,
     tokenSet
   );
+  const hopUserAuthHeaders = headersForGatewayHop(url, userAuthHeaders);
 
   if (method === "POST" && gatewayPath === LATR_GATEWAY_SAVES_PATH) {
     upstreamHeaders[LATR_UPSTREAM_DPOP_HEADER] =
@@ -184,7 +213,7 @@ export async function latrGatewayFetch(
     headers: {
       Accept: "application/json",
       ...clientHeaders,
-      ...userAuthHeaders,
+      ...hopUserAuthHeaders,
       ...upstreamHeaders,
       ...(init?.headers ?? {}),
     },
