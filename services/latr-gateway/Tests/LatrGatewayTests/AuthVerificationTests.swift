@@ -12,12 +12,31 @@ final class AuthVerificationTests: XCTestCase {
         var headers = HTTPFields()
         headers[HTTPField.Name(forwardedAuthorizationHeader)!] = "DPoP forwarded-token"
         headers[HTTPField.Name(forwardedDPOPHeader)!] = "forwarded.dpop.jwt"
+        headers[HTTPField.Name(upstreamDPOPHeader)!] = "upstream.dpop.jwt"
 
         XCTAssertEqual(
             extractAuthorizationHeader(from: headers),
             "DPoP forwarded-token"
         )
         XCTAssertEqual(extractDPOPHeader(from: headers), "forwarded.dpop.jwt")
+        XCTAssertEqual(extractUpstreamDPOPHeader(from: headers), "upstream.dpop.jwt")
+    }
+
+    func testAuthExtractorsAcceptLowercaseForwardedProxyHeaders() throws {
+        var headers = HTTPFields()
+        headers[HTTPField.Name(forwardedAuthorizationHeader.lowercased())!] =
+            "DPoP forwarded-token"
+        headers[HTTPField.Name(forwardedDPOPHeader.lowercased())!] =
+            "forwarded.dpop.jwt"
+        headers[HTTPField.Name(upstreamDPOPHeader.lowercased())!] =
+            "upstream.dpop.jwt"
+
+        XCTAssertEqual(
+            extractAuthorizationHeader(from: headers),
+            "DPoP forwarded-token"
+        )
+        XCTAssertEqual(extractDPOPHeader(from: headers), "forwarded.dpop.jwt")
+        XCTAssertEqual(extractUpstreamDPOPHeader(from: headers), "upstream.dpop.jwt")
     }
 
     func testAuthExtractorsPreferStandardHeadersOverForwardedProxyHeaders() throws {
