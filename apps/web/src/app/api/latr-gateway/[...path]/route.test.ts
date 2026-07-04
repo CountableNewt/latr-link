@@ -69,6 +69,8 @@ describe("/api/latr-gateway proxy", () => {
     expect(target).toBe("https://api.testing.latr.link/v1/latr/saves?limit=10");
     expect(headers.get("Authorization")).toBe("DPoP access");
     expect(headers.get("DPoP")).toBe("gateway-proof");
+    expect(headers.get("X-Latr-Forwarded-Authorization")).toBe("DPoP access");
+    expect(headers.get("X-Latr-Forwarded-DPoP")).toBe("gateway-proof");
     expect(headers.get("X-ATProto-Upstream-DPoP")).toBe("upstream-proof");
     expect(headers.get("X-Latr-Client-Id")).toBe("latr-link-web");
     expect(headers.get("X-Latr-API-Key")).toBe("lk_server");
@@ -186,6 +188,8 @@ describe("/api/latr-gateway proxy", () => {
     expect(res.headers.get("X-Latr-Proxy-User-DPoP")).toBe("custom");
     expect(res.headers.get("X-Latr-Proxy-Upstream-Authorization")).toBe("present");
     expect(res.headers.get("X-Latr-Proxy-Upstream-DPoP")).toBe("present");
+    expect(res.headers.get("X-Latr-Proxy-Forwarded-Authorization")).toBe("present");
+    expect(res.headers.get("X-Latr-Proxy-Forwarded-DPoP")).toBe("present");
   });
 
   test("Allows Local Loopback Gateway Without Server Credentials", async () => {

@@ -31,6 +31,9 @@ const FORWARDED_REQUEST_HEADERS = new Set([
   "x-latr-user-dpop",
 ]);
 
+const LATR_FORWARDED_AUTHORIZATION_HEADER = "X-Latr-Forwarded-Authorization";
+const LATR_FORWARDED_DPOP_HEADER = "X-Latr-Forwarded-DPoP";
+
 const RESPONSE_HEADERS_TO_DROP = new Set([
   "connection",
   "content-encoding",
@@ -151,6 +154,7 @@ function forwardedRequestHeaders(req: Request): {
   ]);
   if (proxiedAuthorization) {
     headers.set("authorization", proxiedAuthorization);
+    headers.set(LATR_FORWARDED_AUTHORIZATION_HEADER, proxiedAuthorization);
     headers.delete(LATR_PROXY_USER_AUTHORIZATION_HEADER);
     headers.delete(LATR_PROXY_USER_AUTHORIZATION_HEADER.toLowerCase());
   }
@@ -161,6 +165,7 @@ function forwardedRequestHeaders(req: Request): {
   ]);
   if (proxiedDpop) {
     headers.set("dpop", proxiedDpop);
+    headers.set(LATR_FORWARDED_DPOP_HEADER, proxiedDpop);
     headers.delete(LATR_PROXY_USER_DPOP_HEADER);
     headers.delete(LATR_PROXY_USER_DPOP_HEADER.toLowerCase());
   }
@@ -242,6 +247,14 @@ async function proxyLatrGateway(req: Request): Promise<Response> {
     responseHeaders.set(
       "X-Latr-Proxy-Upstream-DPoP",
       requestHeaders.get("dpop") ? "present" : "missing"
+    );
+    responseHeaders.set(
+      "X-Latr-Proxy-Forwarded-Authorization",
+      requestHeaders.get(LATR_FORWARDED_AUTHORIZATION_HEADER) ? "present" : "missing"
+    );
+    responseHeaders.set(
+      "X-Latr-Proxy-Forwarded-DPoP",
+      requestHeaders.get(LATR_FORWARDED_DPOP_HEADER) ? "present" : "missing"
     );
   }
 

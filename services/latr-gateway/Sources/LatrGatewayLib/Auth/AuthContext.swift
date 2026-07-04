@@ -27,6 +27,8 @@ public struct AuthContext: Sendable {
 }
 
 public let upstreamDPOPHeader = "X-ATProto-Upstream-DPoP"
+public let forwardedAuthorizationHeader = "X-Latr-Forwarded-Authorization"
+public let forwardedDPOPHeader = "X-Latr-Forwarded-DPoP"
 
 public func extractAccessTokenJWT(from authorization: String) -> String? {
     let trimmed = authorization.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -43,7 +45,19 @@ public func extractAccessTokenJWT(from authorization: String) -> String? {
 }
 
 public func extractDPOPHeader(from headers: HTTPFields) -> String? {
-    for name in ["DPoP", "Dpop", "dpop"] {
+    for name in ["DPoP", "Dpop", "dpop", forwardedDPOPHeader] {
+        guard let fieldName = HTTPField.Name(name) else { continue }
+        if let value = headers[fieldName]?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !value.isEmpty
+        {
+            return value
+        }
+    }
+    return nil
+}
+
+public func extractAuthorizationHeader(from headers: HTTPFields) -> String? {
+    for name in ["Authorization", forwardedAuthorizationHeader] {
         guard let fieldName = HTTPField.Name(name) else { continue }
         if let value = headers[fieldName]?.trimmingCharacters(in: .whitespacesAndNewlines),
            !value.isEmpty
@@ -100,10 +114,7 @@ public func authenticateRequest(
         requireClientAPIKey: requireRegisteredClient
     )
 
-    guard let authorization = request.headers[.authorization]?
-        .trimmingCharacters(in: .whitespacesAndNewlines),
-        !authorization.isEmpty
-    else {
+    guard let authorization = extractAuthorizationHeader(from: request.headers) else {
         throw GatewayError(status: .unauthorized, message: "Missing Authorization header", code: "missing_auth")
     }
 

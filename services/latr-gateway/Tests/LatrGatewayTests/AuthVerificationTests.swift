@@ -8,6 +8,29 @@ import NIOCore
 import XCTest
 
 final class AuthVerificationTests: XCTestCase {
+    func testAuthExtractorsAcceptForwardedProxyHeaders() throws {
+        var headers = HTTPFields()
+        headers[HTTPField.Name(forwardedAuthorizationHeader)!] = "DPoP forwarded-token"
+        headers[HTTPField.Name(forwardedDPOPHeader)!] = "forwarded.dpop.jwt"
+
+        XCTAssertEqual(
+            extractAuthorizationHeader(from: headers),
+            "DPoP forwarded-token"
+        )
+        XCTAssertEqual(extractDPOPHeader(from: headers), "forwarded.dpop.jwt")
+    }
+
+    func testAuthExtractorsPreferStandardHeadersOverForwardedProxyHeaders() throws {
+        var headers = HTTPFields()
+        headers[.authorization] = "DPoP standard-token"
+        headers[HTTPField.Name(forwardedAuthorizationHeader)!] = "DPoP forwarded-token"
+        headers[HTTPField.Name("DPoP")!] = "standard.dpop.jwt"
+        headers[HTTPField.Name(forwardedDPOPHeader)!] = "forwarded.dpop.jwt"
+
+        XCTAssertEqual(extractAuthorizationHeader(from: headers), "DPoP standard-token")
+        XCTAssertEqual(extractDPOPHeader(from: headers), "standard.dpop.jwt")
+    }
+
     func testDPoPRejectsUnsignedProofThatUsedToPassStructureCheck() throws {
         let token = unsignedAccessToken()
         let proof = unsignedProof(
