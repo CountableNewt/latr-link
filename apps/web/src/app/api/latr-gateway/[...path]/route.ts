@@ -97,6 +97,23 @@ function gatewayCredentialHeaders(): Headers {
   return headers;
 }
 
+function isLoopbackGatewayUrl(raw: string): boolean {
+  try {
+    const { hostname } = new URL(raw);
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+  } catch {
+    return false;
+  }
+}
+
+function hasGatewayCredentialHeaders(headers: Headers): boolean {
+  return (
+    Boolean(headers.get(LATR_OFFICIAL_CLIENT_HEADER)) ||
+    (Boolean(headers.get(LATR_CLIENT_ID_HEADER)) &&
+      Boolean(headers.get(LATR_API_KEY_HEADER)))
+  );
+}
+
 function forwardedRequestHeaders(req: Request): Headers {
   const headers = new Headers();
   const url = requestUrl(req);
@@ -122,11 +139,26 @@ function forwardedRequestHeaders(req: Request): Headers {
 async function proxyLatrGateway(req: Request): Promise<Response> {
   const url = requestUrl(req);
   const path = url.pathname.slice(LATR_GATEWAY_PROXY_BASE_PATH.length);
-  const target = `${serverGatewayBaseUrl(req)}${path}${url.search}`;
+  const gatewayBase = serverGatewayBaseUrl(req);
+  const target = `${gatewayBase}${path}${url.search}`;
+  const requestHeaders = forwardedRequestHeaders(req);
+  if (
+    !isLoopbackGatewayUrl(gatewayBase) &&
+    !hasGatewayCredentialHeaders(requestHeaders)
+  ) {
+    return NextResponse.json(
+      {
+        error: "gateway_client_credentials_unconfigured",
+        message:
+          "L@tr gateway client credentials are not configured on the web server.",
+      },
+      { status: 500 }
+    );
+  }
   const body = req.method === "GET" || req.method === "HEAD" ? undefined : req.body;
   const upstream = await fetch(target, {
     method: req.method,
-    headers: forwardedRequestHeaders(req),
+    headers: requestHeaders,
     body,
     redirect: "manual",
     cache: "no-store",
@@ -134,18 +166,18 @@ async function proxyLatrGateway(req: Request): Promise<Response> {
     duplex: body ? "half" : undefined,
   } as RequestInit & { duplex?: "half" });
 
-  const headers = new Headers();
+  const responseHeaders = new Headers();
   for (const [name, value] of upstream.headers) {
     if (!RESPONSE_HEADERS_TO_DROP.has(name.toLowerCase())) {
-      headers.set(name, value);
+      responseHeaders.set(name, value);
     }
   }
-  headers.set("Cache-Control", "no-store");
+  responseHeaders.set("Cache-Control", "no-store");
 
   return new NextResponse(upstream.body, {
     status: upstream.status,
     statusText: upstream.statusText,
-    headers,
+    headers: responseHeaders,
   });
 }
 
