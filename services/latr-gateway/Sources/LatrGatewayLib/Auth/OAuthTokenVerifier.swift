@@ -58,8 +58,15 @@ public struct OAuthTokenVerifier: Sendable {
             throw GatewayError(status: .unauthorized, message: "Token issuer metadata mismatch", code: "invalid_token")
         }
         let jwks = try await fetchJWKSet(jwksURI: metadata.jwks_uri)
+        guard let expectedKeyType = keyType(for: header.alg) else {
+            throw GatewayError(
+                status: .unauthorized,
+                message: "Unsupported token signing algorithm: \(header.alg)",
+                code: "unsupported_token_alg"
+            )
+        }
         guard let key = jwks.keys.first(where: { jwk in
-            guard jwk.kty == keyType(for: header.alg) else { return false }
+            guard jwk.kty == expectedKeyType else { return false }
             guard let kid = header.kid else { return true }
             return jwk.kid == kid
         }) else {
@@ -144,10 +151,10 @@ public struct OAuthTokenVerifier: Sendable {
         }
     }
 
-    private func keyType(for alg: String) -> String {
+    private func keyType(for alg: String) -> String? {
         switch alg {
         case "ES256": "EC"
-        default: ""
+        default: nil
         }
     }
 }

@@ -60,4 +60,36 @@ struct GatewayClientPolicyTests {
             resolvesRegisteredClientRequirement(requireClientAPIKey: nil, config: config) == true
         )
     }
+
+    @Test("Token signature verification defaults to prod only")
+    func tokenSignatureVerificationDefaultsToProdOnly() {
+        let dev = GatewayConfig(
+            port: 8080,
+            appEnv: .dev,
+            plcURL: "https://plc.directory",
+            oauthRequireKnownClient: false
+        )
+        let prod = GatewayConfig(
+            port: 8080,
+            appEnv: .prod,
+            plcURL: "https://plc.directory",
+            oauthRequireKnownClient: true
+        )
+
+        #expect(dev.oauthVerifyTokenSignature == false)
+        #expect(prod.oauthVerifyTokenSignature == true)
+    }
+
+    @Test("Token signature verification can be explicitly enabled outside prod")
+    func tokenSignatureVerificationCanBeEnabledOutsideProd() {
+        let config = GatewayConfig(
+            port: 8080,
+            appEnv: .dev,
+            plcURL: "https://plc.directory",
+            oauthRequireKnownClient: false,
+            oauthVerifyTokenSignature: true
+        )
+
+        #expect(config.oauthVerifyTokenSignature == true)
+    }
 }

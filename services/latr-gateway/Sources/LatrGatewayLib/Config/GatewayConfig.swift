@@ -5,6 +5,7 @@ public struct GatewayConfig: Sendable {
     public let appEnv: AppEnvironment
     public let plcURL: String
     public let oauthRequireKnownClient: Bool
+    public let oauthVerifyTokenSignature: Bool
     public let requireClientAPIKey: Bool
     public let officialClientCredentials: [String: String]
     public let clientRegistryURL: URL
@@ -27,6 +28,7 @@ public struct GatewayConfig: Sendable {
         appEnv: AppEnvironment,
         plcURL: String,
         oauthRequireKnownClient: Bool,
+        oauthVerifyTokenSignature: Bool? = nil,
         requireClientAPIKey: Bool = false,
         officialClientCredentials: [String: String] = [:],
         clientRegistryURL: URL = GatewayConfig.defaultClientRegistryURL(),
@@ -42,6 +44,7 @@ public struct GatewayConfig: Sendable {
         self.appEnv = appEnv
         self.plcURL = plcURL
         self.oauthRequireKnownClient = oauthRequireKnownClient
+        self.oauthVerifyTokenSignature = oauthVerifyTokenSignature ?? (appEnv == .prod)
         self.requireClientAPIKey = requireClientAPIKey
         self.officialClientCredentials = officialClientCredentials
         self.clientRegistryURL = clientRegistryURL
@@ -101,6 +104,13 @@ public struct GatewayConfig: Sendable {
             requireClientAPIKey = appEnv == .prod
         }
 
+        let verifyTokenSignature: Bool
+        if let raw = env["OAUTH_TOKEN_VERIFY_SIGNATURE"] {
+            verifyTokenSignature = parseBool(raw)
+        } else {
+            verifyTokenSignature = appEnv == .prod
+        }
+
         let officialClientCredentials = parseOfficialClientCredentials(
             env["LATR_GATEWAY_OFFICIAL_CLIENT_CREDENTIALS"]
         )
@@ -130,6 +140,7 @@ public struct GatewayConfig: Sendable {
             appEnv: appEnv,
             plcURL: plcURL,
             oauthRequireKnownClient: requireKnown,
+            oauthVerifyTokenSignature: verifyTokenSignature,
             requireClientAPIKey: requireClientAPIKey,
             officialClientCredentials: officialClientCredentials,
             clientRegistryURL: clientRegistryURL,

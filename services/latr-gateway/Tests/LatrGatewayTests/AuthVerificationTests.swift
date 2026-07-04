@@ -192,6 +192,34 @@ final class AuthVerificationTests: XCTestCase {
         try await httpClient.shutdown()
     }
 
+    func testOAuthVerifierReportsUnsupportedES256KTokens() async throws {
+        let key = P256.Signing.PrivateKey()
+        let jwk = jwk(for: key.publicKey)
+        let token = try unsupportedES256KAccessToken(dpopJWK: jwk)
+        let httpClient = HTTPClient(eventLoopGroupProvider: .singleton)
+        let verifier = OAuthTokenVerifier(
+            httpClient: httpClient,
+            fetchData: { url in
+                if url.absoluteString == "https://auth.example/.well-known/oauth-authorization-server" {
+                    return Data(#"{"issuer":"https://auth.example","jwks_uri":"https://auth.example/jwks.json"}"#.utf8)
+                }
+                if url.absoluteString == "https://auth.example/jwks.json" {
+                    let jwks = #"{"keys":[{"kty":"EC","kid":"test-key","crv":"secp256k1","x":"test","y":"test"}]}"#
+                    return Data(jwks.utf8)
+                }
+                throw GatewayError(status: .unauthorized, message: "unexpected url", code: "test")
+            }
+        )
+
+        do {
+            _ = try await verifier.verify(accessToken: token, dpopJWK: jwk)
+            XCTFail("ES256K token verification should fail until secp256k1 support is added")
+        } catch let error as GatewayError {
+            XCTAssertEqual(error.code, "unsupported_token_alg")
+        }
+        try await httpClient.shutdown()
+    }
+
     private func request(
         path: String,
         scheme: String? = "https",
@@ -228,6 +256,13 @@ final class AuthVerificationTests: XCTestCase {
         let jkt = try jwkThumbprint(dpopJWK)
         let payload = #"{"sub":"did:plc:test","iss":"https://auth.example","exp":4102444800,"cnf":{"jkt":"\#(jkt)"}}"#
         return try signJWT(header: header, payload: payload, signingKey: signingKey)
+    }
+
+    private func unsupportedES256KAccessToken(dpopJWK: DPoPJWK) throws -> String {
+        let header = #"{"typ":"at+jwt","alg":"ES256K"}"#
+        let jkt = try jwkThumbprint(dpopJWK)
+        let payload = #"{"sub":"did:plc:test","iss":"https://auth.example","exp":4102444800,"cnf":{"jkt":"\#(jkt)"}}"#
+        return "\(base64URLEncode(Data(header.utf8))).\(base64URLEncode(Data(payload.utf8))).sig"
     }
 
     private func signedDPoP(
