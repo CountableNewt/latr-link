@@ -220,6 +220,36 @@ final class AuthVerificationTests: XCTestCase {
         let verified = try await verifier.verify(accessToken: token, dpopJWK: dpopJWK)
 
         XCTAssertEqual(verified.payload.sub, "did:plc:test")
+        XCTAssertTrue(verified.signatureVerified)
+        try await httpClient.shutdown()
+    }
+
+    func testOAuthVerifierAcceptsDPoPBoundTokenWhenIssuerJWKSIsEmpty() async throws {
+        let signingKey = try P256K.Signing.PrivateKey(
+            dataRepresentation: Data(hex: "5f6d5afecc677d66fb3d41eee7a8ad8195659ceff588edaf416a9a17daf38fdd"),
+            format: .uncompressed
+        )
+        let dpopKey = P256.Signing.PrivateKey()
+        let dpopJWK = jwk(for: dpopKey.publicKey)
+        let token = try signedES256KAccessToken(signingKey: signingKey, dpopJWK: dpopJWK)
+        let httpClient = HTTPClient(eventLoopGroupProvider: .singleton)
+        let verifier = OAuthTokenVerifier(
+            httpClient: httpClient,
+            fetchData: { url in
+                if url.absoluteString == "https://auth.example/.well-known/oauth-authorization-server" {
+                    return Data(#"{"issuer":"https://auth.example","jwks_uri":"https://auth.example/jwks.json"}"#.utf8)
+                }
+                if url.absoluteString == "https://auth.example/jwks.json" {
+                    return Data(#"{"keys":[]}"#.utf8)
+                }
+                throw GatewayError(status: .unauthorized, message: "unexpected url", code: "test")
+            }
+        )
+
+        let verified = try await verifier.verify(accessToken: token, dpopJWK: dpopJWK)
+
+        XCTAssertEqual(verified.payload.sub, "did:plc:test")
+        XCTAssertFalse(verified.signatureVerified)
         try await httpClient.shutdown()
     }
 
