@@ -2,10 +2,12 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { configureLatrGateway } from "latr-web-client/latrGatewayConfig";
 
 import {
+  LATR_GATEWAY_PROXY_BASE_PATH,
   DEFAULT_DEV_LATR_GATEWAY_URL,
   DEFAULT_PROD_LATR_GATEWAY_URL,
   LOCAL_LATR_GATEWAY_URL,
   latrGatewayBaseUrl,
+  latrGatewayProxyBaseUrlForOrigin,
 } from "@/lib/latrGatewayUrl";
 
 const originalEnv = {
@@ -63,5 +65,11 @@ describe("Latr Gateway Base URL", () => {
   test("Honors Explicit NEXT_PUBLIC_LATR_GATEWAY_URL", () => {
     process.env.NEXT_PUBLIC_LATR_GATEWAY_URL = "https://custom.gateway.example/";
     expect(latrGatewayBaseUrl()).toBe("https://custom.gateway.example");
+  });
+
+  test("Builds Same-origin Browser Proxy URL", () => {
+    expect(latrGatewayProxyBaseUrlForOrigin("https://testing.latr.link")).toBe(
+      `https://testing.latr.link${LATR_GATEWAY_PROXY_BASE_PATH}`
+    );
   });
 });

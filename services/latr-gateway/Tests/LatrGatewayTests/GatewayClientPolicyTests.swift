@@ -60,4 +60,5 @@ struct GatewayClientPolicyTests {
             resolvesRegisteredClientRequirement(requireClientAPIKey: nil, config: config) == true
         )
     }
+
 }

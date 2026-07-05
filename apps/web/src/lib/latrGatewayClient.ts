@@ -19,6 +19,7 @@ export async function latrGatewayFetch(
   ...args: Parameters<typeof sharedLatrGatewayFetch>
 ): Promise<Response> {
   syncLatrGatewayFromBrowser();
+  args[3] = { ...args[3], skipClientCredential: true };
   return sharedLatrGatewayFetch(...args);
 }
 
@@ -26,5 +27,6 @@ export async function latrGatewayJson<T>(
   ...args: Parameters<typeof sharedLatrGatewayJson>
 ): Promise<T> {
   syncLatrGatewayFromBrowser();
+  args[3] = { ...args[3], skipClientCredential: true };
   return sharedLatrGatewayJson<T>(...args);
 }

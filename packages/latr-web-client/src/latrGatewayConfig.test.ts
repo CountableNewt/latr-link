@@ -131,4 +131,31 @@ describe("Latr Gateway Base URL", () => {
       globalThis.window = previousWindow;
     }
   });
+
+  test("resolveLatrGatewayConfig Keeps Same-origin Proxy Over Bootstrap Gateway URL", () => {
+    configureLatrGateway({
+      appEnv: "dev",
+      gatewayUrl: "https://testing.latr.link/api/latr-gateway",
+      testingHostname: "testing.latr.link",
+      clientId: "",
+      apiKey: "",
+    });
+    const previousWindow = globalThis.window;
+    globalThis.window = {
+      location: {
+        origin: "https://testing.latr.link",
+      },
+      __LATR_GATEWAY_BOOTSTRAP__: {
+        gatewayUrl: DEFAULT_TESTING_LATR_GATEWAY_URL,
+        appEnv: "dev",
+      },
+    } as Window & typeof globalThis;
+    try {
+      expect(latrGatewayBaseUrl(resolveLatrGatewayConfig())).toBe(
+        "https://testing.latr.link/api/latr-gateway"
+      );
+    } finally {
+      globalThis.window = previousWindow;
+    }
+  });
 });

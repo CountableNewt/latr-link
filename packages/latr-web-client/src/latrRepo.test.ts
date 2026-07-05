@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { OAuthSession } from "@atproto/oauth-client-browser";
 
 import { configureLatrGateway } from "./latrGatewayConfig";
@@ -7,6 +7,8 @@ import {
   markLexiconMigrationComplete,
 } from "./lexiconMigrationCache";
 import { LatrRepo } from "./latrRepo";
+
+const ORIGINAL_FETCH = globalThis.fetch;
 
 beforeEach(() => {
   configureLatrGateway({
@@ -18,6 +20,10 @@ beforeEach(() => {
     apiKey: "",
   });
   clearLexiconMigrationCacheForTests();
+});
+
+afterEach(() => {
+  globalThis.fetch = ORIGINAL_FETCH;
 });
 
 function mockOAuthSession(
@@ -55,9 +61,9 @@ function mockOAuthSession(
 describe("LatrRepo Gateway Facade", () => {
   test("listSavedItems migrates legacy lexicons then reads saved items", async () => {
     const calls: string[] = [];
-    const oauth = mockOAuthSession(async (url, init) => {
+    globalThis.fetch = (async (url, init) => {
       calls.push(`${init?.method ?? "GET"} ${url}`);
-      if (url.includes("/v1/latr/migrate-lexicons")) {
+      if (String(url).includes("/v1/latr/migrate-lexicons")) {
         return new Response(
           JSON.stringify({
             ok: true,
@@ -86,6 +92,12 @@ describe("LatrRepo Gateway Facade", () => {
         }),
         { status: 200, headers: { "Content-Type": "application/json" } }
       );
+    }) as typeof fetch;
+    const oauth = mockOAuthSession(async () => {
+      return new Response(JSON.stringify({ error: "Use DPoP nonce" }), {
+        status: 400,
+        headers: { "DPoP-Nonce": "fresh-pds-nonce" },
+      });
     });
 
     const repo = new LatrRepo(oauth, "did:plc:viewer");
@@ -110,12 +122,18 @@ describe("LatrRepo Gateway Facade", () => {
   test("listSavedItems skips migrate when lexicon migration already completed", async () => {
     markLexiconMigrationComplete("did:plc:viewer");
     const calls: string[] = [];
-    const oauth = mockOAuthSession(async (url, init) => {
+    globalThis.fetch = (async (url, init) => {
       calls.push(`${init?.method ?? "GET"} ${url}`);
       return new Response(
         JSON.stringify({ records: [] }),
         { status: 200, headers: { "Content-Type": "application/json" } }
       );
+    }) as typeof fetch;
+    const oauth = mockOAuthSession(async () => {
+      return new Response(JSON.stringify({ error: "Use DPoP nonce" }), {
+        status: 400,
+        headers: { "DPoP-Nonce": "fresh-pds-nonce" },
+      });
     });
 
     const repo = new LatrRepo(oauth, "did:plc:viewer");
@@ -131,7 +149,7 @@ describe("LatrRepo Gateway Facade", () => {
 
   test("saveExternalUrl POSTs URL Body", async () => {
     let body = "";
-    const oauth = mockOAuthSession(async (_url, init) => {
+    globalThis.fetch = (async (_url, init) => {
       body = String(init?.body ?? "");
       return new Response(
         JSON.stringify({
@@ -144,6 +162,12 @@ describe("LatrRepo Gateway Facade", () => {
         headers: { "Content-Type": "application/json" },
       }
       );
+    }) as typeof fetch;
+    const oauth = mockOAuthSession(async () => {
+      return new Response(JSON.stringify({ error: "Use DPoP nonce" }), {
+        status: 400,
+        headers: { "DPoP-Nonce": "fresh-pds-nonce" },
+      });
     });
 
     const repo = new LatrRepo(oauth, "did:plc:viewer");

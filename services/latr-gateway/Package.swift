@@ -14,6 +14,7 @@ let package = Package(
         .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.0.0"),
         .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.25.0"),
         .package(url: "https://github.com/apple/swift-crypto.git", from: "3.12.0"),
+        .package(url: "https://github.com/21-DOT-DEV/swift-secp256k1", exact: "0.23.2"),
         .package(url: "https://github.com/vapor/postgres-nio.git", from: "1.21.0"),
     ],
     targets: [
@@ -24,6 +25,7 @@ let package = Package(
                 .product(name: "Hummingbird", package: "hummingbird"),
                 .product(name: "AsyncHTTPClient", package: "async-http-client"),
                 .product(name: "Crypto", package: "swift-crypto"),
+                .product(name: "P256K", package: "swift-secp256k1"),
                 .product(name: "PostgresNIO", package: "postgres-nio"),
             ],
             path: "Sources/LatrGatewayLib"

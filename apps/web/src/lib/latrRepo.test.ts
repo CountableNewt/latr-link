@@ -1,7 +1,9 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { OAuthSession } from "@atproto/oauth-client-browser";
 import { configureLatrGateway } from "latr-web-client/latrGatewayConfig";
 import { LatrRepo } from "latr-web-client/latrRepo";
+
+const ORIGINAL_FETCH = globalThis.fetch;
 
 beforeEach(() => {
   configureLatrGateway({
@@ -12,6 +14,10 @@ beforeEach(() => {
     clientId: "",
     apiKey: "",
   });
+});
+
+afterEach(() => {
+  globalThis.fetch = ORIGINAL_FETCH;
 });
 
 function mockOAuthSession(
@@ -49,9 +55,9 @@ function mockOAuthSession(
 describe("Latrrepo Gateway Facade", () => {
   test("listSavedItems migrates legacy lexicons then reads saved items", async () => {
     const calls: string[] = [];
-    const oauth = mockOAuthSession(async (url, init) => {
+    globalThis.fetch = (async (url, init) => {
       calls.push(`${init?.method ?? "GET"} ${url}`);
-      if (url.includes("/v1/latr/migrate-lexicons")) {
+      if (String(url).includes("/v1/latr/migrate-lexicons")) {
         return new Response(
           JSON.stringify({
             ok: true,
@@ -80,6 +86,12 @@ describe("Latrrepo Gateway Facade", () => {
         }),
         { status: 200, headers: { "Content-Type": "application/json" } }
       );
+    }) as typeof fetch;
+    const oauth = mockOAuthSession(async () => {
+      return new Response(JSON.stringify({ error: "Use DPoP nonce" }), {
+        status: 400,
+        headers: { "DPoP-Nonce": "fresh-pds-nonce" },
+      });
     });
 
     const repo = new LatrRepo(oauth, "did:plc:viewer");
@@ -103,15 +115,21 @@ describe("Latrrepo Gateway Facade", () => {
 
   test("saveExternalUrl POSTs URL Body", async () => {
     let body = "";
-    const oauth = mockOAuthSession(async (_url, init) => {
+    globalThis.fetch = (async (_url, init) => {
       body = String(init?.body ?? "");
       return new Response(
         JSON.stringify({ ok: true, kind: "url", storage: "external" }),
         {
-        status: 201,
-        headers: { "Content-Type": "application/json" },
-      }
+          status: 201,
+          headers: { "Content-Type": "application/json" },
+        }
       );
+    }) as typeof fetch;
+    const oauth = mockOAuthSession(async () => {
+      return new Response(JSON.stringify({ error: "Use DPoP nonce" }), {
+        status: 400,
+        headers: { "DPoP-Nonce": "fresh-pds-nonce" },
+      });
     });
 
     const repo = new LatrRepo(oauth, "did:plc:viewer");
@@ -124,11 +142,17 @@ describe("Latrrepo Gateway Facade", () => {
 
   test("setItemState PATCHes State Route", async () => {
     let path = "";
-    const oauth = mockOAuthSession(async (url) => {
-      path = url;
+    globalThis.fetch = (async (url) => {
+      path = String(url);
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+    const oauth = mockOAuthSession(async () => {
+      return new Response(JSON.stringify({ error: "Use DPoP nonce" }), {
+        status: 400,
+        headers: { "DPoP-Nonce": "fresh-pds-nonce" },
       });
     });
 
@@ -139,27 +163,22 @@ describe("Latrrepo Gateway Facade", () => {
 
   test("Unsave Deletes Item Route", async () => {
     let method = "";
-    const oauth = mockOAuthSession(async (_url, init) => {
+    globalThis.fetch = (async (_url, init) => {
       method = init?.method ?? "";
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+    const oauth = mockOAuthSession(async () => {
+      return new Response(JSON.stringify({ error: "Use DPoP nonce" }), {
+        status: 400,
+        headers: { "DPoP-Nonce": "fresh-pds-nonce" },
       });
     });
 
     const repo = new LatrRepo(oauth, "did:plc:viewer");
     await repo.unsave("item-rkey");
     expect(method).toBe("DELETE");
-  });
-});
-
-describe("Latr Gateway Base URL", () => {
-  test("Re-exports Env-aware Gateway URL Resolution", async () => {
-    const prev = process.env.NEXT_PUBLIC_LATR_GATEWAY_URL;
-    process.env.NEXT_PUBLIC_APP_ENV = "local";
-    delete process.env.NEXT_PUBLIC_LATR_GATEWAY_URL;
-    const { latrGatewayBaseUrl } = await import("./latrGatewayClient");
-    expect(latrGatewayBaseUrl()).toBe("http://127.0.0.1:8080");
-    if (prev) process.env.NEXT_PUBLIC_LATR_GATEWAY_URL = prev;
   });
 });

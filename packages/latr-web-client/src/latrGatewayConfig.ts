@@ -68,11 +68,13 @@ function mergeGatewayConfigWithWindowBootstrap(
   const apiKey = bootstrap.apiKey?.trim();
   const clientCredential = bootstrap.clientCredential?.trim();
   const gatewayUrl = bootstrap.gatewayUrl?.trim();
+  const keepConfiguredProxy =
+    config.gatewayUrl?.trim() && isSameOriginGatewayProxyUrl(config.gatewayUrl.trim());
 
   return {
     ...config,
     ...(bootstrap.appEnv ? { appEnv: bootstrap.appEnv } : {}),
-    ...(gatewayUrl ? { gatewayUrl } : {}),
+    ...(gatewayUrl && !keepConfiguredProxy ? { gatewayUrl } : {}),
     ...(clientCredential ? { clientCredential } : {}),
     ...(clientId && apiKey ? { clientId, apiKey } : {}),
   };
@@ -139,6 +141,19 @@ function isLoopbackGatewayUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
     return isLoopbackHostname(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function isSameOriginGatewayProxyUrl(url: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const parsed = new URL(url);
+    return (
+      parsed.origin === window.location.origin &&
+      parsed.pathname.replace(/\/$/, "") === "/api/latr-gateway"
+    );
   } catch {
     return false;
   }
@@ -216,6 +231,7 @@ export function assertLatrGatewayClientCredential(
   if (headers[LATR_OFFICIAL_CLIENT_HEADER]) return;
   const base = latrGatewayBaseUrl(resolved);
   if (isLoopbackGatewayUrl(base)) return;
+  if (isSameOriginGatewayProxyUrl(base)) return;
 
   const bootstrap = readWindowGatewayBootstrap();
   const bootstrapClientId = Boolean(bootstrap?.clientId?.trim());

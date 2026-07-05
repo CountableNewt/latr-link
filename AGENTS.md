@@ -25,7 +25,7 @@
 - Public foundation packages use descriptive names (`ATProtoPrimitiveKit`, `ATProtoAuthKit`, …), not a `Stygian` prefix; app-specific packages (`latr-kit`, `latr-packages`, …) keep product names.
 - Shared package dependencies should resolve via git/npm/SwiftPM remotes — not sibling local paths — so CI and contributors run without monorepo-local checkouts.
 - Swift gateway CI should treat compiler warnings as errors.
-- Official gateway credentials should be server-side secrets (Next.js BFF routes) when possible; L@tr web uses **`LATR_GATEWAY_CLIENT_CREDENTIAL`** (not `NEXT_PUBLIC_*`; root layout reads server env per request and `next.config.ts` inlines at build — still in the bundle) and the extension uses **`VITE_*`** — interim for browser-direct gateway calls. Third-party clients use the registration API separately.
+- Official gateway credentials should be server-side secrets. L@tr web uses the same-origin Next.js **`/api/latr-gateway/*`** proxy, which forwards OAuth/DPoP headers and injects **`LATR_GATEWAY_CLIENT_CREDENTIAL`** or split **`LATR_GATEWAY_CLIENT_ID`** + **`LATR_GATEWAY_API_KEY`** server-side; do **not** expose these as `NEXT_PUBLIC_*` or serialize them into the client. The extension uses **`VITE_*`** — interim for browser-direct gateway calls. Third-party clients use the registration API separately.
 
 ## Learned Workspace Facts
 

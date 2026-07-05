@@ -143,7 +143,16 @@ public func buildRouter(services: GatewayServices) -> Router<BasicRequestContext
 
             let library = services.savedLibrary(for: auth)
             let key = RecordKey.key(forSubjectURI: subjectURI)
-            let record = try await library.savedItem(withKey: key)
+            let record: RepositoryRecord<SavedItem>?
+            if auth.accessTokenSignatureVerified {
+                record = try await library.savedItem(withKey: key)
+            } else {
+                record = try await services.repositoryClient(for: auth).authenticatedRecord(
+                    in: auth.did,
+                    collection: .savedItem,
+                    withKey: key
+                )
+            }
             return try jsonResponse(SavedItemLookupResponse(record: record))
         }
     }
@@ -260,8 +269,10 @@ private func handleProtected(
         let auth = try await authenticateRequest(
             request,
             config: services.config,
-            store: services.developerStore
+            store: services.developerStore,
+            httpClient: services.httpClient
         )
+        try requireLocallyVerifiedTokenIfNeeded(auth: auth, path: request.uri.path)
         if let clientID = auth.clientID {
             try await services.developerStore.assertWithinDailyLimit(clientID: clientID)
         }
@@ -275,5 +286,17 @@ private func handleProtected(
         return response
     } catch {
         return errorResponse(error)
+    }
+}
+
+private func requireLocallyVerifiedTokenIfNeeded(auth: AuthContext, path: String) throws {
+    guard !auth.accessTokenSignatureVerified else { return }
+
+    if path.contains("/og-preview") || path.contains("/discover/at-uri") {
+        throw GatewayError(
+            status: .unauthorized,
+            message: "Access token signature could not be verified for this route",
+            code: "invalid_token"
+        )
     }
 }

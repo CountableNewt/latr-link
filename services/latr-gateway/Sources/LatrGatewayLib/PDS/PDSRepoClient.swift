@@ -77,12 +77,12 @@ public struct PDSRepositoryClient: RepositoryClient, Sendable {
         let requestURL: String
         let dpopProof: String
         let usedUpstreamProof: Bool
-        if let consumed = upstreamPool.consume(forXrpcMethod: method, httpMethod: "POST") {
+        let base = try await pdsBase()
+        if let consumed = upstreamPool.consume(forXrpcMethod: method, httpMethod: "POST", pdsBase: base) {
             requestURL = consumed.url
             dpopProof = consumed.proof
             usedUpstreamProof = true
         } else {
-            let base = try await pdsBase()
             requestURL = "\(base)/xrpc/\(method)"
             dpopProof = auth.dpopProof
             usedUpstreamProof = false
@@ -151,17 +151,16 @@ public struct PDSRepositoryClient: RepositoryClient, Sendable {
     private func xrpcGet(method: String, query: [String: String], useAuth: Bool) async throws -> [String: Any] {
         let xrpcBaseURL: String
         let dpopProof: String?
+        let base = try await pdsBase()
         if useAuth {
-            if let consumed = upstreamPool.consume(forXrpcMethod: method, httpMethod: "GET") {
+            if let consumed = upstreamPool.consume(forXrpcMethod: method, httpMethod: "GET", pdsBase: base) {
                 xrpcBaseURL = consumed.url
                 dpopProof = consumed.proof
             } else {
-                let base = try await pdsBase()
                 xrpcBaseURL = "\(base)/xrpc/\(method)"
                 dpopProof = auth.dpopProof
             }
         } else {
-            let base = try await pdsBase()
             xrpcBaseURL = "\(base)/xrpc/\(method)"
             dpopProof = nil
         }
@@ -263,10 +262,27 @@ public struct PDSRepositoryClient: RepositoryClient, Sendable {
         collection: LexiconCollection,
         withKey key: String
     ) async throws -> RepositoryRecord<Value>? where Value: Codable & Sendable {
+        try await record(in: repository, collection: collection, withKey: key, useAuth: false)
+    }
+
+    public func authenticatedRecord<Value>(
+        in repository: String,
+        collection: LexiconCollection,
+        withKey key: String
+    ) async throws -> RepositoryRecord<Value>? where Value: Codable & Sendable {
+        try await record(in: repository, collection: collection, withKey: key, useAuth: true)
+    }
+
+    private func record<Value>(
+        in repository: String,
+        collection: LexiconCollection,
+        withKey key: String,
+        useAuth: Bool
+    ) async throws -> RepositoryRecord<Value>? where Value: Codable & Sendable {
         let json = try await xrpcGet(
             method: "com.atproto.repo.getRecord",
             query: ["repo": repository, "collection": collection.identifier, "rkey": key],
-            useAuth: false
+            useAuth: useAuth
         )
         guard let uri = json["uri"] as? String,
               let cid = json["cid"] as? String,
@@ -348,4 +364,3 @@ public struct PDSRepositoryClient: RepositoryClient, Sendable {
         )
     }
 }
-

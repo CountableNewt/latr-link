@@ -1,3 +1,4 @@
+import AsyncHTTPClient
 import Foundation
 import Hummingbird
 
@@ -127,7 +128,19 @@ private func handleDeveloper(
     handler: (AuthContext) async throws -> Response
 ) async -> Response {
     do {
-        let auth = try await authenticateDeveloperRequest(request, config: services.config, store: services.developerStore)
+        let auth = try await authenticateDeveloperRequest(
+            request,
+            config: services.config,
+            store: services.developerStore,
+            httpClient: services.httpClient
+        )
+        guard auth.accessTokenSignatureVerified else {
+            throw GatewayError(
+                status: .unauthorized,
+                message: "Access token signature could not be verified for developer routes",
+                code: "invalid_token"
+            )
+        }
         return try await handler(auth)
     } catch {
         return errorResponse(error)
@@ -137,12 +150,14 @@ private func handleDeveloper(
 private func authenticateDeveloperRequest(
     _ request: Request,
     config: GatewayConfig,
-    store: any DeveloperStore
+    store: any DeveloperStore,
+    httpClient: HTTPClient
 ) async throws -> AuthContext {
     try await authenticateRequest(
         request,
         config: config,
         store: store,
+        httpClient: httpClient,
         requireClientAPIKey: false
     )
 }
