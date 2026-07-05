@@ -17,7 +17,8 @@ import {
 import { Providers } from "./providers";
 
 const title = "L@tr.link";
-const description = "Save Now. Read Later. Yours Everywhere.";
+const description =
+  "Save links, posts, and ATProto records to a read-later library you own.";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://latr.link"),
