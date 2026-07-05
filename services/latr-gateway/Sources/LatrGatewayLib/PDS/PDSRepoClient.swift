@@ -262,10 +262,27 @@ public struct PDSRepositoryClient: RepositoryClient, Sendable {
         collection: LexiconCollection,
         withKey key: String
     ) async throws -> RepositoryRecord<Value>? where Value: Codable & Sendable {
+        try await record(in: repository, collection: collection, withKey: key, useAuth: false)
+    }
+
+    public func authenticatedRecord<Value>(
+        in repository: String,
+        collection: LexiconCollection,
+        withKey key: String
+    ) async throws -> RepositoryRecord<Value>? where Value: Codable & Sendable {
+        try await record(in: repository, collection: collection, withKey: key, useAuth: true)
+    }
+
+    private func record<Value>(
+        in repository: String,
+        collection: LexiconCollection,
+        withKey key: String,
+        useAuth: Bool
+    ) async throws -> RepositoryRecord<Value>? where Value: Codable & Sendable {
         let json = try await xrpcGet(
             method: "com.atproto.repo.getRecord",
             query: ["repo": repository, "collection": collection.identifier, "rkey": key],
-            useAuth: false
+            useAuth: useAuth
         )
         guard let uri = json["uri"] as? String,
               let cid = json["cid"] as? String,

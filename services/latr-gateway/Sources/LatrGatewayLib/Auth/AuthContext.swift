@@ -10,19 +10,22 @@ public struct AuthContext: Sendable {
     public let upstreamDpopProof: String?
     /// Resolved official client id when `LATR_GATEWAY_REQUIRE_CLIENT_API_KEY` is enabled.
     public let clientID: String?
+    public let accessTokenSignatureVerified: Bool
 
     public init(
         did: String,
         authorizationHeader: String,
         dpopProof: String,
         upstreamDpopProof: String? = nil,
-        clientID: String? = nil
+        clientID: String? = nil,
+        accessTokenSignatureVerified: Bool = true
     ) {
         self.did = did
         self.authorizationHeader = authorizationHeader
         self.dpopProof = dpopProof
         self.upstreamDpopProof = upstreamDpopProof
         self.clientID = clientID
+        self.accessTokenSignatureVerified = accessTokenSignatureVerified
     }
 }
 
@@ -128,12 +131,15 @@ public func authenticateRequest(
     let dpopJWK = try verifyGatewayDPoP(proof: dpop, accessToken: accessToken, request: request)
 
     let payload: JWTPayload
+    let accessTokenSignatureVerified: Bool
     if let httpClient {
-        payload = try await OAuthTokenVerifier(httpClient: httpClient)
+        let verified = try await OAuthTokenVerifier(httpClient: httpClient)
             .verify(accessToken: accessToken, dpopJWK: dpopJWK)
-            .payload
+        payload = verified.payload
+        accessTokenSignatureVerified = verified.signatureVerified
     } else {
         payload = try decodeJWTPayload(accessToken)
+        accessTokenSignatureVerified = false
         if let jkt = payload.cnf?.jkt {
             guard try jkt == jwkThumbprint(dpopJWK) else {
                 throw GatewayError(status: .unauthorized, message: "Token DPoP key mismatch", code: "invalid_token")
@@ -171,7 +177,8 @@ public func authenticateRequest(
         authorizationHeader: authorization,
         dpopProof: dpop,
         upstreamDpopProof: upstream,
-        clientID: clientID
+        clientID: clientID,
+        accessTokenSignatureVerified: accessTokenSignatureVerified
     )
 }
 

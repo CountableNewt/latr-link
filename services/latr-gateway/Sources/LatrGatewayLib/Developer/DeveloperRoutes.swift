@@ -134,6 +134,13 @@ private func handleDeveloper(
             store: services.developerStore,
             httpClient: services.httpClient
         )
+        guard auth.accessTokenSignatureVerified else {
+            throw GatewayError(
+                status: .unauthorized,
+                message: "Access token signature could not be verified for developer routes",
+                code: "invalid_token"
+            )
+        }
         return try await handler(auth)
     } catch {
         return errorResponse(error)

@@ -30,6 +30,7 @@ private struct OAuthJWK: Decodable {
 
 struct VerifiedOAuthToken: Sendable {
     let payload: JWTPayload
+    let signatureVerified: Bool
 }
 
 public struct OAuthTokenVerifier: Sendable {
@@ -59,7 +60,6 @@ public struct OAuthTokenVerifier: Sendable {
         if let metadataIssuer = metadata.issuer, metadataIssuer != issuer {
             throw GatewayError(status: .unauthorized, message: "Token issuer metadata mismatch", code: "invalid_token")
         }
-        let jwks = try await fetchJWKSet(jwksURI: metadata.jwks_uri)
         guard let expectedKeyType = keyType(for: header.alg) else {
             throw GatewayError(
                 status: .unauthorized,
@@ -67,6 +67,7 @@ public struct OAuthTokenVerifier: Sendable {
                 code: "unsupported_token_alg"
             )
         }
+        let jwks = try await fetchJWKSet(jwksURI: metadata.jwks_uri)
         guard let key = jwks.keys.first(where: { jwk in
             guard jwk.kty == expectedKeyType else { return false }
             guard jwk.alg == nil || jwk.alg == header.alg else { return false }
@@ -74,6 +75,10 @@ public struct OAuthTokenVerifier: Sendable {
             guard let kid = header.kid else { return true }
             return jwk.kid == kid
         }) else {
+            if jwks.keys.isEmpty {
+                try verifyDPoPConfirmation(payload: payload, dpopJWK: dpopJWK)
+                return VerifiedOAuthToken(payload: payload, signatureVerified: false)
+            }
             throw GatewayError(status: .unauthorized, message: "Token signing key not found", code: "invalid_token")
         }
 
@@ -81,6 +86,12 @@ public struct OAuthTokenVerifier: Sendable {
             throw GatewayError(status: .unauthorized, message: "Invalid token signature", code: "invalid_token")
         }
 
+        try verifyDPoPConfirmation(payload: payload, dpopJWK: dpopJWK)
+
+        return VerifiedOAuthToken(payload: payload, signatureVerified: true)
+    }
+
+    private func verifyDPoPConfirmation(payload: JWTPayload, dpopJWK: DPoPJWK) throws {
         if let cnf = payload.cnf, let jkt = cnf.jkt {
             guard try jkt == jwkThumbprint(dpopJWK) else {
                 throw GatewayError(status: .unauthorized, message: "Token DPoP key mismatch", code: "invalid_token")
@@ -88,8 +99,6 @@ public struct OAuthTokenVerifier: Sendable {
         } else {
             throw GatewayError(status: .unauthorized, message: "Token missing DPoP confirmation", code: "invalid_token")
         }
-
-        return VerifiedOAuthToken(payload: payload)
     }
 
     private func decodeJWTHeader(_ token: String) throws -> OAuthTokenHeader {
