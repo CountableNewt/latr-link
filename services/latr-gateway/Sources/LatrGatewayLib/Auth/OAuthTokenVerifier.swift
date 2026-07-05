@@ -1,6 +1,7 @@
 import AsyncHTTPClient
 import Crypto
 import Foundation
+import P256K
 
 private struct OAuthTokenHeader: Decodable {
     let alg: String
@@ -19,6 +20,7 @@ private struct JWKSet: Decodable {
 private struct OAuthJWK: Decodable {
     let kty: String
     let kid: String?
+    let alg: String?
     let crv: String?
     let x: String?
     let y: String?
@@ -67,6 +69,8 @@ public struct OAuthTokenVerifier: Sendable {
         }
         guard let key = jwks.keys.first(where: { jwk in
             guard jwk.kty == expectedKeyType else { return false }
+            guard jwk.alg == nil || jwk.alg == header.alg else { return false }
+            guard jwk.curveSupports(alg: header.alg) else { return false }
             guard let kid = header.kid else { return true }
             return jwk.kid == kid
         }) else {
@@ -135,8 +139,7 @@ public struct OAuthTokenVerifier: Sendable {
         let signature = try jwtSignature(jwt)
         switch header.alg {
         case "ES256":
-            guard key.crv == "P-256",
-                  let x = key.x.flatMap(base64URLDecode),
+            guard let x = key.x.flatMap(base64URLDecode),
                   let y = key.y.flatMap(base64URLDecode),
                   x.count == 32,
                   y.count == 32
@@ -146,6 +149,18 @@ public struct OAuthTokenVerifier: Sendable {
             let publicKey = try P256.Signing.PublicKey(x963Representation: Data([0x04]) + x + y)
             let ecdsa = try P256.Signing.ECDSASignature(rawRepresentation: signature)
             return publicKey.isValidSignature(ecdsa, for: signingInput)
+        case "ES256K":
+            guard let x = key.x.flatMap(base64URLDecode),
+                  let y = key.y.flatMap(base64URLDecode),
+                  x.count == 32,
+                  y.count == 32,
+                  signature.count == 64
+            else {
+                return false
+            }
+            let publicKey = try P256K.Signing.PublicKey(x963Representation: Data([0x04]) + x + y)
+            let ecdsa = try P256K.Signing.ECDSASignature(compactRepresentation: signature)
+            return publicKey.isValidSignature(ecdsa, for: signingInput)
         default:
             return false
         }
@@ -153,8 +168,21 @@ public struct OAuthTokenVerifier: Sendable {
 
     private func keyType(for alg: String) -> String? {
         switch alg {
-        case "ES256": "EC"
+        case "ES256", "ES256K": "EC"
         default: nil
+        }
+    }
+}
+
+private extension OAuthJWK {
+    func curveSupports(alg: String) -> Bool {
+        switch alg {
+        case "ES256":
+            crv == "P-256"
+        case "ES256K":
+            crv == "secp256k1"
+        default:
+            false
         }
     }
 }
