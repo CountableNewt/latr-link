@@ -2,7 +2,27 @@
 
 import { type MouseEvent, type ReactElement, useState } from "react";
 
+import {
+  Archive,
+  ArchiveRestore,
+  ExternalLink,
+  FileText,
+  Link2,
+  MessageCircle,
+  Bookmark,
+  Trash2,
+  type LucideIcon,
+} from "lucide-react";
+
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { parsedHttpHttpsUrl } from "@/components/EmbeddedPageDialog";
 import { useOpenEmbeddedReader } from "@/contexts/embeddedReader";
 import {
@@ -10,10 +30,16 @@ import {
   useSavedLibraryMutations,
   type SavedRow,
 } from "@/hooks/useSavedLibrary";
+import { readingMinutesForRow } from "@/lib/demoLibrary";
 import { rkeyFromAtUri } from "@/lib/rkey";
 import { isEnvironmentBannerShown } from "@/lib/environmentBanner";
 import type { ResolvedPreview } from "@/lib/resolveSubject";
-import { Archive, ArchiveRestore, Link2, Trash2 } from "lucide-react";
+import {
+  filterSavedRowsByContent,
+  savedRowContentBucket,
+  type SavedRowsFilter,
+} from "@/lib/savedRowContent";
+import { cn } from "@/lib/utils";
 
 const showSavedStorageDevHint = isEnvironmentBannerShown();
 
@@ -21,14 +47,24 @@ function devSavedStorageLabel(kind: ResolvedPreview["kind"]) {
   return kind === "external" ? "External" : "AT Record";
 }
 
-function SavedLinkThumbnailPlaceholder() {
+function contentTypeIcon(bucket: Exclude<SavedRowsFilter, "all">): {
+  Icon: LucideIcon;
+  label: string;
+} {
+  if (bucket === "article") return { Icon: FileText, label: "Article" };
+  if (bucket === "social") return { Icon: MessageCircle, label: "Social" };
+  return { Icon: Bookmark, label: "Other" };
+}
+
+function SavedLinkThumbnailPlaceholder({ kind }: { kind: ResolvedPreview["kind"] }) {
+  const Icon = kind === "post" ? MessageCircle : kind === "record" ? FileText : Link2;
   return (
     <div
       role="img"
       aria-label="No Preview Image"
-      className="flex h-[4.5rem] w-[4.5rem] shrink-0 items-center justify-center rounded-md border border-dashed border-zinc-300 bg-zinc-100 text-zinc-400 dark:border-zinc-600 dark:bg-zinc-900/70 dark:text-zinc-500"
+      className="flex aspect-[1.08] w-24 shrink-0 items-center justify-center overflow-hidden rounded-md border border-dashed border-border bg-muted text-muted-foreground"
     >
-      <Link2 className="h-6 w-6" aria-hidden strokeWidth={1.75} />
+      <Icon className="size-6" aria-hidden strokeWidth={1.75} />
     </div>
   );
 }
@@ -49,15 +85,16 @@ function faviconUrlForOrigin(origin: string): string {
 function savedAtShort(iso: string): string {
   try {
     return new Intl.DateTimeFormat("en-US", {
-      dateStyle: "medium",
-      timeStyle: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
     }).format(new Date(iso));
   } catch {
-    return iso.slice(0, 19);
+    return iso.slice(0, 10);
   }
 }
 
-function filterRows(
+export function filterSavedRows(
   rows: SavedRow[] | undefined,
   mode: "unread" | "archive"
 ): SavedRow[] {
@@ -69,48 +106,110 @@ function filterRows(
   });
 }
 
+export type SavedRowsSort = "newest" | "oldest" | "title";
+
+export function sortSavedRows(rows: SavedRow[], sort: SavedRowsSort): SavedRow[] {
+  return [...rows].sort((a, b) => {
+    if (sort === "title") {
+      return a.preview.title.localeCompare(b.preview.title, "en-US", {
+        sensitivity: "base",
+      });
+    }
+
+    const aTime = Date.parse(a.rec.value.savedAt);
+    const bTime = Date.parse(b.rec.value.savedAt);
+    const safeATime = Number.isFinite(aTime) ? aTime : 0;
+    const safeBTime = Number.isFinite(bTime) ? bTime : 0;
+    return sort === "newest" ? safeBTime - safeATime : safeATime - safeBTime;
+  });
+}
+
 function mutationErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Something Went Wrong";
 }
 
-export function SavedRows({ mode }: { mode: "unread" | "archive" }) {
+function LoadingRows() {
+  return (
+    <div className="divide-y divide-border rounded-lg border border-border bg-card">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div key={index} className="flex gap-3 p-2.5">
+          <Skeleton className="aspect-[1.08] w-24 shrink-0" />
+          <div className="flex flex-1 flex-col gap-2 py-1">
+            <Skeleton className="h-5 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="h-4 w-full" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function SavedRows({
+  mode,
+  filter = "all",
+  sort = "newest",
+}: {
+  mode: "unread" | "archive";
+  filter?: SavedRowsFilter;
+  sort?: SavedRowsSort;
+}) {
   const { data, isLoading, error } = useSavedLibrary();
   const mutations = useSavedLibraryMutations();
   const openEmbeddedReader = useOpenEmbeddedReader();
 
-  const rows = filterRows(data, mode);
+  const rows = sortSavedRows(
+    filterSavedRowsByContent(filterSavedRows(data, mode), filter),
+    sort
+  );
 
   let main: ReactElement;
   if (isLoading) {
-    main = <p className="p-4 text-sm text-zinc-500">Loading Saved Items…</p>;
+    main = <LoadingRows />;
   } else if (error) {
     main = (
-      <p className="p-4 text-sm text-red-600">
+      <div className="rounded-lg border border-destructive/25 bg-card p-6 text-sm text-destructive">
         {error instanceof Error ? error.message : "Failed to Load"}
-      </p>
+      </div>
     );
   } else if (!rows.length) {
     main = (
-      <p className="p-6 text-sm text-zinc-500">
-        {mode === "unread"
-          ? "Nothing in Your Queue Yet. Paste a URL or AT URI Above to Save It."
-          : "Archive Is Empty."}
-      </p>
+      <div className="rounded-lg border border-dashed border-border bg-card p-8 text-center">
+        <div className="mx-auto flex size-11 items-center justify-center rounded-md bg-accent text-primary">
+          <Link2 className="size-5" aria-hidden strokeWidth={1.9} />
+        </div>
+        <p className="mt-4 text-sm font-medium text-foreground">
+          {filter !== "all"
+            ? "No Matching Items."
+            : mode === "unread"
+              ? "Nothing in Your Queue Yet."
+              : "Archive Is Empty."}
+        </p>
+        <p className="mx-auto mt-1 max-w-sm text-sm leading-6 text-muted-foreground">
+          {filter !== "all"
+            ? "Choose a different filter to return to your saved queue."
+            : mode === "unread"
+              ? "Paste a URL or AT URI above to save something for later."
+              : "Archived reads will collect here after you clear them from Unread."}
+        </p>
+      </div>
     );
   } else {
     main = (
-      <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
-        {rows.map((row) => (
-          <SavedRowItem
-            key={row.rec.uri}
-            row={row}
-            canMutate={mutations.canMutate}
-            onArchiveToggle={mutations.setItemState}
-            onRemove={mutations.unsave}
-            onOpenEmbedded={openEmbeddedReader}
-          />
-        ))}
-      </ul>
+      <TooltipProvider>
+        <ul className="divide-y divide-border rounded-lg border border-border bg-card shadow-sm">
+          {rows.map((row) => (
+            <SavedRowItem
+              key={row.rec.uri}
+              row={row}
+              canMutate={mutations.canMutate}
+              onArchiveToggle={mutations.setItemState}
+              onRemove={mutations.unsave}
+              onOpenEmbedded={openEmbeddedReader}
+            />
+          ))}
+        </ul>
+      </TooltipProvider>
     );
   }
 
@@ -156,47 +255,47 @@ function SavedRowItem({
   const thumb = p.imageHref;
   const [busy, setBusy] = useState(false);
   const isArchived = row.rec.value.state === "archived";
+  const readMinutes = readingMinutesForRow(row);
+  const contentType = contentTypeIcon(savedRowContentBucket(row));
 
   const openLabel = `Open Saved Link: ${p.title}`;
 
   return (
-    <li className="group relative flex flex-col gap-3 p-4 hover:bg-zinc-50 dark:hover:bg-zinc-900/40 sm:flex-row sm:items-stretch sm:gap-4">
+    <li className="group relative grid gap-3 p-2.5 transition-colors hover:bg-accent/25 sm:grid-cols-[6rem_minmax(0,1fr)]">
       <button
         type="button"
         aria-label={openLabel}
-        onClick={(e) =>
-          activateSavedHref(href, p.title, onOpenEmbedded, e)
-        }
+        onClick={(e) => activateSavedHref(href, p.title, onOpenEmbedded, e)}
         onAuxClick={(e) => {
           if (e.button !== 1) return;
           e.preventDefault();
           const http = parsedHttpHttpsUrl(href);
           window.open(http?.href ?? href, "_blank", "noopener,noreferrer");
         }}
-        className="absolute inset-0 z-0 cursor-pointer rounded-md border-0 bg-transparent text-left outline-offset-2 focus-visible:z-20 focus-visible:ring-2 focus-visible:ring-zinc-400 dark:focus-visible:ring-zinc-500"
+        className="absolute inset-0 z-0 cursor-pointer rounded-md border-0 bg-transparent text-left outline-offset-2 focus-visible:z-20 focus-visible:ring-2 focus-visible:ring-ring"
       />
-      <div className="relative z-10 flex min-w-0 flex-1 flex-col gap-3 pointer-events-none sm:flex-row sm:items-center sm:gap-4">
-        <div className="shrink-0 self-start sm:self-center">
-          {thumb ? (
-            <div className="flex h-[4.5rem] min-w-[4.5rem] max-w-[min(100%,11rem)] shrink-0 items-center justify-center overflow-hidden rounded-md border border-zinc-200 bg-zinc-50 p-px dark:border-zinc-700 dark:bg-zinc-900/65">
-              {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary remote OG image URLs */}
-              <img
-                src={thumb}
-                alt=""
-                loading="lazy"
-                decoding="async"
-                className="block max-h-full max-w-full h-auto w-auto object-contain"
-              />
-            </div>
-          ) : (
-            <SavedLinkThumbnailPlaceholder />
-          )}
-        </div>
-        <div className="flex min-w-0 flex-1 flex-col gap-2">
-          <div className="flex min-w-0 items-start gap-2">
-            {origin ? (
-              <>
-                {/* eslint-disable-next-line @next/next/no-img-element -- favicon resolver origin */}
+      <div className="relative z-10 pointer-events-none">
+        {thumb ? (
+          <div className="flex aspect-[1.08] w-24 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted">
+            {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary remote OG image URLs */}
+            <img
+              src={thumb}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className="block size-full object-cover"
+            />
+          </div>
+        ) : (
+          <SavedLinkThumbnailPlaceholder kind={p.kind} />
+        )}
+      </div>
+      <div className="relative z-10 flex min-w-0 flex-col gap-1.5 pr-26 pointer-events-none">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+              {origin ? (
+                // eslint-disable-next-line @next/next/no-img-element -- favicon resolver origin
                 <img
                   src={faviconUrlForOrigin(origin)}
                   alt=""
@@ -204,101 +303,141 @@ function SavedRowItem({
                   height={16}
                   loading="lazy"
                   decoding="async"
-                  className="mt-1 h-4 w-4 shrink-0"
+                  className="size-4 shrink-0"
                 />
-              </>
-            ) : null}
-            <div className="min-w-0 flex-1">
-              <p className="font-medium leading-snug text-zinc-900 underline-offset-4 group-hover:underline dark:text-zinc-100">
-                {p.title}
-              </p>
-              {p.subtitle && (
-                <p className="mt-0.5 line-clamp-2 text-sm text-zinc-500">
-                  {p.subtitle}
-                </p>
-              )}
-              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-400">
-                <span className="min-w-0 truncate">
-                  {(p.siteLabel ?? p.kind) +
-                    " · " +
-                    savedAtShort(row.rec.value.savedAt)}
-                </span>
-                {showSavedStorageDevHint ? (
-                  <span
-                    title={
-                      p.kind === "external"
-                        ? "Saved Via link.latr.saved.external Wrapper"
-                        : "Saved Subject Is a Native at:// Record Reference"
-                    }
-                    className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide ${
-                      p.kind === "external"
-                        ? "border border-amber-700/55 bg-amber-100 text-amber-950 dark:border-amber-500/60 dark:bg-amber-950/55 dark:text-amber-50"
-                        : "border border-violet-700/55 bg-violet-100 text-violet-950 dark:border-violet-500/60 dark:bg-violet-950/55 dark:text-violet-50"
-                    }`}
-                  >
-                    {devSavedStorageLabel(p.kind)}
-                  </span>
-                ) : null}
-              </div>
+              ) : null}
+              <span className="font-medium text-foreground/80">
+                {p.siteLabel ?? p.kind}
+              </span>
+              <span aria-hidden>•</span>
+              <span>{savedAtShort(row.rec.value.savedAt)}</span>
+              <span aria-hidden>•</span>
+              <span>{readMinutes} min read</span>
+              {isArchived ? <Badge variant="secondary">Archived</Badge> : null}
             </div>
+            <p className="mt-0.5 text-base font-semibold leading-snug text-foreground underline-offset-4 group-hover:underline">
+              {p.title}
+            </p>
+            {p.subtitle ? (
+              <p className="mt-1 line-clamp-2 text-sm leading-5 text-muted-foreground">
+                {p.subtitle}
+              </p>
+            ) : null}
           </div>
         </div>
       </div>
-      {canMutate ? (
-        <div className="relative z-10 flex shrink-0 flex-row items-center gap-2 self-end pointer-events-auto sm:self-center">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            disabled={busy}
-            aria-label={isArchived ? "Unarchive" : "Archive"}
-            title={isArchived ? "Unarchive" : "Archive"}
-            onClick={async () => {
-              if (busy) return;
-              setBusy(true);
-              const next = isArchived ? "unread" : "archived";
-              try {
-                await onArchiveToggle(itemRkey, next);
-              } catch (error) {
-                window.alert(mutationErrorMessage(error));
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            {isArchived ? (
-              <ArchiveRestore className="h-4 w-4" aria-hidden strokeWidth={2} />
-            ) : (
-              <Archive className="h-4 w-4" aria-hidden strokeWidth={2} />
+      {showSavedStorageDevHint ? (
+        <div className="absolute right-2.5 top-2.5 z-10 flex items-center gap-1 pointer-events-none">
+          <Badge
+            variant={p.kind === "external" ? "outline" : "secondary"}
+            className={cn(
+              "font-mono text-[10px] uppercase",
+              p.kind === "external"
+                ? "border-amber-300 bg-amber-50 text-amber-800"
+                : "text-primary"
             )}
-          </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            size="icon"
-            disabled={busy}
-            aria-label="Remove From Library"
-            title="Remove From Library"
-            onClick={async () => {
-              if (busy) return;
-              const ok = window.confirm(
-                "Remove This Saved Item From Your Library? This Cannot Be Undone."
-              );
-              if (!ok) return;
-              setBusy(true);
-              try {
-                await onRemove(itemRkey);
-              } catch (error) {
-                window.alert(mutationErrorMessage(error));
-              } finally {
-                setBusy(false);
-              }
-            }}
+            title={
+              p.kind === "external"
+                ? "Saved Via link.latr.saved.external Wrapper"
+                : "Saved Subject Is a Native at:// Record Reference"
+            }
           >
-            <Trash2 className="h-4 w-4" aria-hidden strokeWidth={2} />
-          </Button>
+            {devSavedStorageLabel(p.kind)}
+          </Badge>
+          <span
+            className="inline-flex size-6 items-center justify-center rounded-md border border-border bg-background/90 text-muted-foreground"
+            title={contentType.label}
+            aria-label={contentType.label}
+          >
+            <contentType.Icon className="size-3.5" aria-hidden strokeWidth={1.9} />
+          </span>
         </div>
       ) : null}
+      <div className="absolute bottom-2.5 right-2.5 z-10 flex shrink-0 items-center gap-0.5 pointer-events-auto">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label="Open"
+              title="Open"
+              className="size-8"
+              onClick={(e) => activateSavedHref(href, p.title, onOpenEmbedded, e)}
+            >
+              <ExternalLink className="size-4" aria-hidden strokeWidth={1.9} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Open</TooltipContent>
+        </Tooltip>
+        {canMutate ? (
+          <>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  disabled={busy}
+                  aria-label={isArchived ? "Unarchive" : "Archive"}
+                  title={isArchived ? "Unarchive" : "Archive"}
+                  className="size-8"
+                  onClick={async () => {
+                    if (busy) return;
+                    setBusy(true);
+                    const next = isArchived ? "unread" : "archived";
+                    try {
+                      await onArchiveToggle(itemRkey, next);
+                    } catch (error) {
+                      window.alert(mutationErrorMessage(error));
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  {isArchived ? (
+                    <ArchiveRestore className="size-4" aria-hidden strokeWidth={1.9} />
+                  ) : (
+                    <Archive className="size-4" aria-hidden strokeWidth={1.9} />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{isArchived ? "Unarchive" : "Archive"}</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  disabled={busy}
+                  aria-label="Remove From Library"
+                  title="Remove From Library"
+                  className="size-8"
+                  onClick={async () => {
+                    if (busy) return;
+                    const ok = window.confirm(
+                      "Remove This Saved Item From Your Library? This Cannot Be Undone."
+                    );
+                    if (!ok) return;
+                    setBusy(true);
+                    try {
+                      await onRemove(itemRkey);
+                    } catch (error) {
+                      window.alert(mutationErrorMessage(error));
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  <Trash2 className="size-4" aria-hidden strokeWidth={1.9} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Remove</TooltipContent>
+            </Tooltip>
+          </>
+        ) : null}
+      </div>
     </li>
   );
 }

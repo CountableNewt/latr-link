@@ -14,6 +14,11 @@ import "./globals.css";
 import {
   buildGatewayWindowBootstrap,
 } from "@/lib/latrGatewayUrl";
+import {
+  BOLD_TEXT_STORAGE_KEY,
+  FONT_STORAGE_KEY,
+  THEME_STORAGE_KEY,
+} from "@/lib/theme";
 import { Providers } from "./providers";
 
 const title = "L@tr.link";
@@ -72,7 +77,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full antialiased" suppressHydrationWarning>
       <body
-        className="min-h-full flex flex-col bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100"
+        className="min-h-full flex flex-col bg-background text-foreground"
         style={bodyStyle}
         suppressHydrationWarning
       >
@@ -81,6 +86,9 @@ export default function RootLayout({
         </Script>
         <Script id="latr-gateway-bootstrap" strategy="beforeInteractive">
           {`window.__LATR_GATEWAY_BOOTSTRAP__=${JSON.stringify(gatewayBootstrap)};`}
+        </Script>
+        <Script id="latr-theme-bootstrap" strategy="beforeInteractive">
+          {`(()=>{try{const tk=${JSON.stringify(THEME_STORAGE_KEY)};const fk=${JSON.stringify(FONT_STORAGE_KEY)};const bk=${JSON.stringify(BOLD_TEXT_STORAGE_KEY)};const p=localStorage.getItem(tk);const pref=p==="light"||p==="dark"||p==="system"?p:"system";const f=localStorage.getItem(fk);const font=f==="serif"||f==="mono"||f==="sans"?f:"sans";const bold=localStorage.getItem(bk)==="1";const systemDark=matchMedia("(prefers-color-scheme: dark)").matches;const computed=pref==="dark"||pref==="system"&&systemDark?"dark":"light";const root=document.documentElement;root.classList.toggle("dark",computed==="dark");root.classList.toggle("light",computed==="light");root.dataset.theme=pref;root.dataset.computedTheme=computed;root.dataset.font=font;root.dataset.boldText=bold?"true":"false";root.style.colorScheme=computed}catch{}})();`}
         </Script>
         <Providers>
           <EnvironmentBanner appEnv={appEnv} />

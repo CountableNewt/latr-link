@@ -5,6 +5,7 @@ import type { RepoRecord } from "@/lib/latrRepo";
 import {
   previewFromSavedItemRecord,
   previewHasRichMetadata,
+  previewKindForSavedItemRecord,
   savedItemHasProtocolPreview,
 } from "@/lib/resolveSubject";
 import {
@@ -83,7 +84,7 @@ describe("Preview from Saved Item Record", () => {
     expect(preview?.subtitle).toBe("By Jane Doe");
   });
 
-  test("Native Subject With linkedWebUrl Is Not Classified as External", () => {
+  test("Bluesky Subject With linkedWebUrl Is Still Classified as a Post", () => {
     const preview = previewFromSavedItemRecord(
       savedItem({
         subjectUri: "at://did:plc:author/app.bsky.feed.post/3abc",
@@ -91,6 +92,18 @@ describe("Preview from Saved Item Record", () => {
       })
     );
     expect(preview?.kind).toBe("post");
+  });
+
+  test("Standard Site Article Subjects Are Classified as External Articles", () => {
+    const record = savedItem({
+      subjectUri: "at://did:plc:author/site.standard.article/3abc",
+      linkedWebUrl: undefined,
+      previewTitle: "Longform Article",
+      previewSite: "standard.site",
+    });
+
+    expect(previewKindForSavedItemRecord(record.value)).toBe("external");
+    expect(previewFromSavedItemRecord(record)?.kind).toBe("external");
   });
 });
 
