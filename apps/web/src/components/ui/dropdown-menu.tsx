@@ -5,7 +5,39 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 function DropdownMenu({ children }: { children: React.ReactNode }) {
-  return <details className="group/dropdown relative">{children}</details>;
+  const detailsRef = React.useRef<HTMLDetailsElement>(null);
+
+  React.useEffect(() => {
+    function closeIfOutside(event: PointerEvent | FocusEvent) {
+      const details = detailsRef.current;
+      const target = event.target;
+      if (!details?.open || !(target instanceof Node)) return;
+      if (details.contains(target)) return;
+      details.removeAttribute("open");
+    }
+
+    function closeOnEscape(event: KeyboardEvent) {
+      const details = detailsRef.current;
+      if (!details?.open || event.key !== "Escape") return;
+      details.removeAttribute("open");
+      details.querySelector("summary")?.focus();
+    }
+
+    document.addEventListener("pointerdown", closeIfOutside);
+    document.addEventListener("focusin", closeIfOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeIfOutside);
+      document.removeEventListener("focusin", closeIfOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, []);
+
+  return (
+    <details ref={detailsRef} className="group/dropdown relative">
+      {children}
+    </details>
+  );
 }
 
 function DropdownMenuTrigger({
