@@ -1,6 +1,6 @@
 "use client";
 
-import { type MouseEvent, type ReactElement, useState } from "react";
+import { type CSSProperties, type MouseEvent, type ReactElement, useState } from "react";
 
 import {
   Archive,
@@ -14,6 +14,14 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -254,11 +262,27 @@ function SavedRowItem({
   const origin = siteOrigin(p.canonicalUrl);
   const thumb = p.imageHref;
   const [busy, setBusy] = useState(false);
+  const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
+  const [removeDialogLeft, setRemoveDialogLeft] = useState<number | null>(null);
   const isArchived = row.rec.value.state === "archived";
   const readMinutes = readingMinutesForRow(row);
   const contentType = contentTypeIcon(savedRowContentBucket(row));
 
   const openLabel = `Open Saved Link: ${p.title}`;
+  const removeDialogStyle: CSSProperties | undefined =
+    removeDialogLeft === null ? undefined : { left: removeDialogLeft };
+
+  function openRemoveDialog(trigger: HTMLElement) {
+    const contentColumn = trigger.closest("section");
+    const columnRect = contentColumn?.getBoundingClientRect();
+    setRemoveDialogLeft(columnRect ? columnRect.left + columnRect.width / 2 : null);
+    setRemoveDialogOpen(true);
+  }
+
+  function handleRemoveDialogOpenChange(open: boolean) {
+    setRemoveDialogOpen(open);
+    if (!open) setRemoveDialogLeft(null);
+  }
 
   return (
     <li className="group relative grid gap-3 p-2.5 transition-colors hover:bg-accent/25 sm:grid-cols-[6rem_minmax(0,1fr)]">
@@ -413,28 +437,84 @@ function SavedRowItem({
                   disabled={busy}
                   aria-label="Remove From Library"
                   title="Remove From Library"
-                  className="size-8"
-                  onClick={async () => {
-                    if (busy) return;
-                    const ok = window.confirm(
-                      "Remove This Saved Item From Your Library? This Cannot Be Undone."
-                    );
-                    if (!ok) return;
-                    setBusy(true);
-                    try {
-                      await onRemove(itemRkey);
-                    } catch (error) {
-                      window.alert(mutationErrorMessage(error));
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
+                  className="size-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  onClick={(event) => openRemoveDialog(event.currentTarget)}
                 >
                   <Trash2 className="size-4" aria-hidden strokeWidth={1.9} />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Remove</TooltipContent>
             </Tooltip>
+            <AlertDialog
+              open={removeDialogOpen}
+              onOpenChange={handleRemoveDialogOpenChange}
+              style={removeDialogStyle}
+            >
+              <AlertDialogContent>
+                <AlertDialogHeader className="items-center text-center">
+                  <AlertDialogTitle className="text-center">
+                    Remove This Saved Item?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription className="text-center">
+                    <span className="block">
+                      {"'Archive' clears the article from 'Unread'."}
+                    </span>
+                    <span className="block">
+                      {"'Remove' permanently deletes the saved link."}
+                    </span>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setRemoveDialogOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  {!isArchived ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={busy}
+                      onClick={async () => {
+                        if (busy) return;
+                        setBusy(true);
+                        try {
+                          await onArchiveToggle(itemRkey, "archived");
+                          setRemoveDialogOpen(false);
+                        } catch (error) {
+                          window.alert(mutationErrorMessage(error));
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                    >
+                      Archive Instead
+                    </Button>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    disabled={busy}
+                    onClick={async () => {
+                      if (busy) return;
+                      setBusy(true);
+                      try {
+                        await onRemove(itemRkey);
+                        setRemoveDialogOpen(false);
+                      } catch (error) {
+                        window.alert(mutationErrorMessage(error));
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                  >
+                    Remove Permanently
+                  </Button>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </>
         ) : null}
       </div>

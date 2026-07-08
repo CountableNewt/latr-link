@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 
 import { ArrowRight, BookOpen, ShieldCheck } from "lucide-react";
 
+import { BrandLockup } from "@/components/BrandLockup";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -71,10 +72,7 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-app flex-1 bg-background">
       <section className="hidden min-h-app flex-1 border-r border-border bg-card px-8 py-10 lg:flex lg:flex-col">
-        <Link href="/" className="flex items-center gap-2">
-          <Image src={iconSrc} alt="" width={34} height={34} className="rounded-lg" />
-          <span className="text-xl font-semibold text-primary">L@tr.link</span>
-        </Link>
+        <BrandLockup iconSize={34} />
         <div className="my-auto max-w-xl">
           <Badge variant="secondary">Read-Later Library</Badge>
           <h1 className="mt-6 text-5xl font-semibold leading-tight text-foreground">
