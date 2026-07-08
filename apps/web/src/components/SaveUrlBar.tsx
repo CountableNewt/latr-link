@@ -1,12 +1,18 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useAuth } from "@/hooks/useAuth";
 import { useInvalidateSavedLibrary } from "@/hooks/useSavedLibrary";
 import { useLatrRepo } from "@/hooks/useLatrRepo";
+import { createDemoSavedRowFromPaste } from "@/lib/demoLibrary";
+import { isLatrDemoDataEnabled } from "@/lib/demoMode";
 import { showSaveOutcomeDebugLabels } from "@/lib/environmentBanner";
 import { resolvePasteForSave } from "@/lib/resolveSaveInput";
+import type { SavedRow } from "@/lib/savedLibraryTypes";
 
 /** Mirrors “AT record” dev chip tint in SavedRows.tsx */
 const savePathDebugChip =
@@ -28,6 +34,9 @@ function debugDetailForSave(
 
 export function SaveUrlBar() {
   const repo = useLatrRepo();
+  const demoMode = isLatrDemoDataEnabled();
+  const queryClient = useQueryClient();
+  const { session } = useAuth();
   const invalidate = useInvalidateSavedLibrary();
   const [paste, setPaste] = useState("");
   const [feedback, setFeedback] = useState<SaveFeedback | null>(null);
@@ -35,10 +44,21 @@ export function SaveUrlBar() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!repo || !paste.trim()) return;
+    if ((!repo && !demoMode) || !paste.trim()) return;
     setBusy(true);
     setFeedback(null);
     try {
+      if (demoMode) {
+        const row = createDemoSavedRowFromPaste(paste);
+        queryClient.setQueryData<SavedRow[]>(
+          ["saved-library", session?.did],
+          (rows) => [row, ...(rows ?? [])]
+        );
+        setFeedback({ mode: "plain", text: "Saved to local demo data." });
+        setPaste("");
+        return;
+      }
+      if (!repo) throw new Error("Sign In to Save Items");
       const resolved = resolvePasteForSave(paste);
       if (resolved.kind === "subject") {
         const response = await repo.saveSubjectUri(resolved.subjectUri);
@@ -78,35 +98,34 @@ export function SaveUrlBar() {
   }
 
   return (
-    <div className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+    <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
       <form
         onSubmit={(e) => void onSubmit(e)}
-        className="flex flex-wrap items-end gap-2 px-4 py-3"
+        className="flex flex-col gap-3 sm:flex-row sm:items-end"
       >
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <label htmlFor="save-paste" className="text-xs font-medium text-zinc-500">
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <label htmlFor="save-paste" className="text-xs font-medium text-muted-foreground">
             Save Link or AT URI
           </label>
-          <input
+          <Input
             id="save-paste"
             type="text"
             value={paste}
             onChange={(e) => setPaste(e.target.value)}
             placeholder="https://… or at://did…/collection/rkey"
-            disabled={busy || !repo}
+            disabled={busy || (!repo && !demoMode)}
             spellCheck={false}
             autoComplete="off"
             enterKeyHint="done"
-            className="h-9 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm dark:border-zinc-600 dark:bg-zinc-900"
           />
         </div>
-        <Button type="submit" disabled={busy || !paste.trim() || !repo}>
+        <Button type="submit" disabled={busy || !paste.trim() || (!repo && !demoMode)}>
           {busy ? "Saving…" : "Save"}
         </Button>
       </form>
       {feedback &&
         (feedback.mode === "debug" ? (
-          <div className="px-4 pb-3">
+          <div className="pt-3">
             <span className={savePathDebugChip} title="Save Pathway (Dev)">
               <span className="shrink-0 font-mono text-[10px] font-semibold uppercase tracking-wide opacity-95">
                 [DEBUG]
@@ -117,7 +136,7 @@ export function SaveUrlBar() {
             </span>
           </div>
         ) : (
-          <p className="px-4 pb-3 text-xs text-zinc-500 dark:text-zinc-400">
+          <p className="pt-3 text-xs text-muted-foreground">
             {feedback.text}
           </p>
         ))}

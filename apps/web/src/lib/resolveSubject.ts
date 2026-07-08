@@ -76,6 +76,48 @@ export function previewKindForSubjectUri(
   return "record";
 }
 
+function isHttpWebUrl(value?: string): boolean {
+  if (!value) return false;
+  try {
+    const protocol = new URL(value).protocol;
+    return protocol === "http:" || protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+export function articleRecordNamespaceForAtUri(subjectUri: string): boolean {
+  try {
+    const collection = new AtUri(subjectUri).collection.toLowerCase();
+    return articleRecordNamespace(collection);
+  } catch {
+    return false;
+  }
+}
+
+export function articleRecordNamespace(value?: string): boolean {
+  const lower = value?.trim().toLowerCase();
+  if (!lower) return false;
+  return (
+    lower.includes("standard.site") ||
+    lower.includes("site.standard") ||
+    lower.includes("whtwnd.blog") ||
+    lower.includes("blog.entry") ||
+    lower.endsWith(".article")
+  );
+}
+
+export function previewKindForSavedItemRecord(
+  item: SavedItemRecord
+): ResolvedPreview["kind"] {
+  const subjectKind = previewKindForSubjectUri(item.subjectUri);
+  if (subjectKind === "post") return "post";
+  if (subjectKind === "external") return "external";
+  if (isHttpWebUrl(item.linkedWebUrl)) return "external";
+  if (articleRecordNamespaceForAtUri(item.subjectUri)) return "external";
+  return subjectKind;
+}
+
 function subjectPreviewLooksResolved(
   preview: ResolvedPreview,
   subjectUri: string,
@@ -203,7 +245,7 @@ export function previewFromSavedItemRecord(
     item.subjectUri;
 
   return {
-    kind: previewKindForSubjectUri(item.subjectUri),
+    kind: previewKindForSavedItemRecord(item),
     title,
     subtitle: previewSubtitle(item.previewExcerpt, item.previewAuthor),
     href: canonicalUrl || (external ? linked : undefined),
@@ -224,7 +266,7 @@ export async function resolveSubjectPreviewForRow(
   const cached = readCachedSubjectPreview(subjectUri, fingerprint);
   if (cached) return cached;
 
-  const subjectKind = previewKindForSubjectUri(subjectUri);
+  const subjectKind = previewKindForSavedItemRecord(rec.value);
   const linked = rec.value.linkedWebUrl?.trim();
 
   if (savedItemHasProtocolPreview(rec.value)) {
@@ -393,6 +435,12 @@ export function mergeSavedItemOgPreview(
 
   return {
     ...preview,
+    kind:
+      preview.kind === "post"
+        ? "post"
+        : linked || articleRecordNamespaceForAtUri(item.subjectUri)
+          ? "external"
+          : preview.kind,
     title: item.previewTitle?.trim() || preview.title,
     subtitle:
       previewSubtitle(item.previewExcerpt, item.previewAuthor) ||
@@ -472,7 +520,10 @@ export async function resolveSubjectPreview(
       };
     }
     return {
-      kind: "record",
+      kind: articleRecordNamespace(v.$type) ||
+        articleRecordNamespaceForAtUri(subjectUri)
+        ? "external"
+        : "record",
       title: pickPostText(direct.value),
       subtitle: v.$type,
     };

@@ -15,6 +15,7 @@ import {
   signIn as authSignIn,
   signOut as authSignOut,
 } from "@/lib/auth";
+import { DEMO_DID, isLatrDemoDataEnabled } from "@/lib/demoMode";
 
 interface AuthSession {
   did: string;
@@ -35,11 +36,17 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSession] = useState<AuthSession | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const demoMode = isLatrDemoDataEnabled();
+  const [session, setSession] = useState<AuthSession | null>(
+    demoMode ? { did: DEMO_DID } : null
+  );
+  const [isLoading, setIsLoading] = useState(!demoMode);
   const oauthSessionRef = useRef<OAuthSession | null>(null);
 
   useEffect(() => {
+    if (demoMode) {
+      return;
+    }
     let cancelled = false;
     getSession()
       .then((oauthSession) => {
@@ -57,19 +64,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [demoMode]);
 
   const handleSignIn = useCallback(async (handle: string) => {
+    if (demoMode) {
+      setSession({ did: DEMO_DID });
+      return;
+    }
     await authSignIn(handle);
-  }, []);
+  }, [demoMode]);
 
   const handleSignOut = useCallback(async () => {
+    if (demoMode) {
+      setSession({ did: DEMO_DID });
+      return;
+    }
     if (session) {
       await authSignOut(session.did);
       oauthSessionRef.current = null;
       setSession(null);
     }
-  }, [session]);
+  }, [demoMode, session]);
 
   const applyOAuthSession = useCallback((oauthSession: OAuthSession) => {
     oauthSessionRef.current = oauthSession;
