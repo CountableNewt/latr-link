@@ -7,17 +7,20 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLatrRepo } from "@/hooks/useLatrRepo";
 import {
   resolveSubjectPreviewForRow,
-  type ResolvedPreview,
 } from "@/lib/resolveSubject";
-import type { LatrRepo, RepoRecord } from "@/lib/latrRepo";
-import type { SavedItemRecord, SavedItemState } from "@/lib/latrRecords";
+import type { LatrRepo } from "@/lib/latrRepo";
+import type { SavedItemState } from "@/lib/latrRecords";
 import { rkeyFromAtUri } from "@/lib/rkey";
 import { removeCachedSubjectPreview } from "@/lib/savedPreviewCache";
+import {
+  createDemoSavedRows,
+  removeSavedRow,
+  setSavedRowState,
+} from "@/lib/demoLibrary";
+import { isLatrDemoDataEnabled } from "@/lib/demoMode";
+import type { SavedRow } from "@/lib/savedLibraryTypes";
 
-export type SavedRow = {
-  rec: RepoRecord<SavedItemRecord>;
-  preview: ResolvedPreview;
-};
+export type { SavedRow } from "@/lib/savedLibraryTypes";
 
 async function buildLibrary(
   repo: LatrRepo
@@ -40,11 +43,12 @@ async function buildLibrary(
 export function useSavedLibrary() {
   const repo = useLatrRepo();
   const { session } = useAuth();
+  const demoMode = isLatrDemoDataEnabled();
 
   return useQuery({
     queryKey: ["saved-library", session?.did],
-    queryFn: () => buildLibrary(repo!),
-    enabled: !!repo && !!session,
+    queryFn: () => (demoMode ? createDemoSavedRows() : buildLibrary(repo!)),
+    enabled: !!session && (demoMode || !!repo),
     refetchOnWindowFocus: "always",
   });
 }
@@ -67,6 +71,7 @@ export function useSavedLibraryMutations() {
   const queryClient = useQueryClient();
   const { session } = useAuth();
   const repo = useLatrRepo();
+  const demoMode = isLatrDemoDataEnabled();
   const queryKey = savedLibraryQueryKey(session?.did);
 
   const patchRows = useCallback(
@@ -81,21 +86,20 @@ export function useSavedLibraryMutations() {
 
   const setItemState = useCallback(
     async (itemRkey: string, state: SavedItemState) => {
-      if (!repo) throw new Error("Sign In to Update Saved Items");
+      if (!repo && !demoMode) throw new Error("Sign In to Update Saved Items");
 
       const previous = queryClient.getQueryData<SavedRow[]>(queryKey);
       patchRows((rows) =>
-        rows.map((row) => {
-          if (rkeyFromAtUri(row.rec.uri) !== itemRkey) return row;
-          return {
-            ...row,
-            rec: {
-              ...row.rec,
-              value: { ...row.rec.value, state },
-            },
-          };
-        })
+        setSavedRowState(
+          rows,
+          itemRkey,
+          state,
+          state === "archived" ? new Date().toISOString() : undefined
+        )
       );
+
+      if (demoMode) return;
+      if (!repo) throw new Error("Sign In to Update Saved Items");
 
       try {
         await repo.setItemState(itemRkey, state);
@@ -106,17 +110,18 @@ export function useSavedLibraryMutations() {
         throw error;
       }
     },
-    [patchRows, queryClient, queryKey, repo]
+    [demoMode, patchRows, queryClient, queryKey, repo]
   );
 
   const unsave = useCallback(
     async (itemRkey: string) => {
-      if (!repo) throw new Error("Sign In to Remove Saved Items");
+      if (!repo && !demoMode) throw new Error("Sign In to Remove Saved Items");
 
       const previous = queryClient.getQueryData<SavedRow[]>(queryKey);
-      patchRows((rows) =>
-        rows.filter((row) => rkeyFromAtUri(row.rec.uri) !== itemRkey)
-      );
+      patchRows((rows) => removeSavedRow(rows, itemRkey));
+
+      if (demoMode) return;
+      if (!repo) throw new Error("Sign In to Remove Saved Items");
 
       try {
         await repo.unsave(itemRkey);
@@ -131,12 +136,12 @@ export function useSavedLibraryMutations() {
         throw error;
       }
     },
-    [patchRows, queryClient, queryKey, repo]
+    [demoMode, patchRows, queryClient, queryKey, repo]
   );
 
   return {
     setItemState,
     unsave,
-    canMutate: !!repo && !!session,
+    canMutate: !!session && (demoMode || !!repo),
   };
 }

@@ -8,6 +8,7 @@ import {
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { AuthProvider } from "@/hooks/useAuth";
+import { ThemeProvider } from "@/hooks/useTheme";
 import { syncLatrGatewayFromBrowser } from "@/lib/latrGatewayUrl";
 
 const QUERY_PERSIST_KEY = "latr.link.react-query.v1";
@@ -51,19 +52,21 @@ export function Providers({
   );
 
   return (
-    <AuthProvider>
-      <PersistQueryClientProvider
-        client={queryClient}
-        persistOptions={{
-          persister,
-          maxAge: QUERY_PERSIST_MAX_AGE_MS,
-          dehydrateOptions: {
-            shouldDehydrateQuery,
-          },
-        }}
-      >
-        {children}
-      </PersistQueryClientProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <PersistQueryClientProvider
+          client={queryClient}
+          persistOptions={{
+            persister,
+            maxAge: QUERY_PERSIST_MAX_AGE_MS,
+            dehydrateOptions: {
+              shouldDehydrateQuery,
+            },
+          }}
+        >
+          {children}
+        </PersistQueryClientProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

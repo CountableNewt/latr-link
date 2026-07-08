@@ -3,9 +3,16 @@
 import { FormEvent, useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
+import { ArrowRight, BookOpen, ShieldCheck } from "lucide-react";
+
+import { BrandLockup } from "@/components/BrandLockup";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
+import { isLatrDemoDataEnabled } from "@/lib/demoMode";
 import iconSrc from "@/app/icon.png";
 
 const callbackErrorMessage =
@@ -30,6 +37,8 @@ function readCallbackErrorFromUrl(): string | null {
 
 export default function LoginPage() {
   const { signIn } = useAuth();
+  const router = useRouter();
+  const demoMode = isLatrDemoDataEnabled();
   const [handle, setHandle] = useState("");
   const callbackError = useSyncExternalStore(
     subscribeToLoginSearchParams,
@@ -47,80 +56,119 @@ export default function LoginPage() {
     setIsPending(true);
     try {
       await signIn(handle.trim());
+      if (demoMode) {
+        router.replace("/library");
+      }
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
           : "Sign-In Failed. Check Your Handle and Try Again."
       );
-      setIsPending(false);
     }
+    setIsPending(false);
   }
 
   return (
-    <div className="flex min-h-app flex-1 flex-col items-center justify-center gap-3 bg-zinc-50 p-4 dark:bg-zinc-950">
-      <div className="w-full max-w-sm space-y-6 rounded-xl border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="text-center">
-          <div className="mb-4 flex justify-center">
-            <Image
-              src={iconSrc}
-              alt=""
-              width={56}
-              height={56}
-              className="rounded-2xl"
-              priority
-            />
+    <main className="flex min-h-app flex-1 bg-background">
+      <section className="hidden min-h-app flex-1 border-r border-border bg-card px-8 py-10 lg:flex lg:flex-col">
+        <BrandLockup iconSize={34} />
+        <div className="my-auto max-w-xl">
+          <Badge variant="secondary">Read-Later Library</Badge>
+          <h1 className="mt-6 text-5xl font-semibold leading-tight text-foreground">
+            Save the Article Now. Keep the Record Yours.
+          </h1>
+          <p className="mt-5 text-lg leading-8 text-muted-foreground">
+            L@tr.link gives your reading queue a calm home while storing saved
+            metadata through your ATProto account.
+          </p>
+          <div className="mt-8 grid gap-3">
+            <div className="flex items-center gap-3 rounded-lg border border-border bg-background p-4">
+              <BookOpen className="size-5 text-primary" aria-hidden strokeWidth={1.9} />
+              <span className="text-sm font-medium text-foreground">
+                Articles, Posts, and Records in One Queue
+              </span>
+            </div>
+            <div className="flex items-center gap-3 rounded-lg border border-border bg-background p-4">
+              <ShieldCheck className="size-5 text-primary" aria-hidden strokeWidth={1.9} />
+              <span className="text-sm font-medium text-foreground">
+                OAuth Sign-In with Protocol-Scoped Access
+              </span>
+            </div>
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">L@tr.link</h1>
-          <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-            Read Later — Stored on Your PDS, Not Our Servers.
+        </div>
+      </section>
+
+      <section className="flex flex-1 items-center justify-center px-4 py-10">
+        <div className="w-full max-w-sm">
+          <div className="rounded-xl border border-border bg-card p-7 shadow-sm">
+            <div className="text-center">
+              <div className="mb-4 flex justify-center">
+                <Image
+                  src={iconSrc}
+                  alt=""
+                  width={56}
+                  height={56}
+                  className="rounded-2xl"
+                  priority
+                />
+              </div>
+              <h1 className="text-2xl font-semibold">L@tr.link</h1>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Read Later, Stored on Your PDS.
+              </p>
+              {demoMode ? (
+                <Badge variant="secondary" className="mt-3">
+                  Local Demo Mode
+                </Badge>
+              ) : null}
+            </div>
+
+            <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <label htmlFor="handle" className="text-sm font-medium">
+                  Handle
+                </label>
+                <Input
+                  id="handle"
+                  type="text"
+                  value={handle}
+                  onChange={(e) => setHandle(e.target.value)}
+                  placeholder={demoMode ? "reader.latr.local" : "you.bsky.social"}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  autoComplete="username"
+                  spellCheck={false}
+                  required={!demoMode}
+                  disabled={isPending}
+                />
+              </div>
+
+              {displayError ? (
+                <p className="text-sm text-destructive" role="alert">
+                  {displayError}
+                </p>
+              ) : null}
+
+              <Button
+                type="submit"
+                size="lg"
+                disabled={isPending || (!demoMode && !handle.trim())}
+                className="w-full"
+              >
+                {isPending ? "Signing In…" : "Continue with ATProto"}
+                <ArrowRight className="size-4" aria-hidden strokeWidth={2} />
+              </Button>
+            </form>
+          </div>
+          <p className="mt-4 text-center text-xs text-muted-foreground">
+            New here?{" "}
+            <Link href="https://bsky.app" className="font-medium text-primary underline-offset-2 hover:underline">
+              Join Bluesky
+            </Link>
           </p>
         </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <label htmlFor="handle" className="text-sm font-medium">
-              Handle
-            </label>
-            <input
-              id="handle"
-              type="text"
-              value={handle}
-              onChange={(e) => setHandle(e.target.value)}
-              placeholder="you.bsky.social"
-              autoCapitalize="none"
-              autoCorrect="off"
-              autoComplete="username"
-              spellCheck={false}
-              required
-              disabled={isPending}
-              className="flex h-10 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-950 dark:ring-offset-zinc-950"
-            />
-          </div>
-
-          {displayError && (
-            <p className="text-sm text-red-600 dark:text-red-400">{displayError}</p>
-          )}
-
-          <Button
-            type="submit"
-            size="lg"
-            disabled={isPending || !handle.trim()}
-            className="w-full"
-          >
-            {isPending ? "Signing in…" : "Continue with ATProto"}
-          </Button>
-        </form>
-      </div>
-      <p className="text-center text-xs text-zinc-500">
-        New Here?{" "}
-        <Link
-          href="https://bsky.app"
-          className="underline underline-offset-2"
-        >
-          Join Bluesky
-        </Link>
-      </p>
-    </div>
+      </section>
+    </main>
   );
 }

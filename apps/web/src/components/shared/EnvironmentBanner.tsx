@@ -26,7 +26,7 @@ export function EnvironmentBanner({ appEnv }: EnvironmentBannerProps) {
       aria-label={`${appEnv} environment`}
       className={bannerClasses(appEnv)}
     >
-      <p className="font-medium">{body}</p>
+      <p className="truncate whitespace-nowrap font-medium">{body}</p>
     </div>
   );
 }

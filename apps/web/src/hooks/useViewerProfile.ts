@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { useAuth } from "@/hooks/useAuth";
 import { BSKY_APPVIEW_PUBLIC } from "@/lib/appview";
+import { DEMO_DID, DEMO_HANDLE, isLatrDemoDataEnabled } from "@/lib/demoMode";
 
 export const VIEWER_PROFILE_QUERY_KEY = (did: string) =>
   ["viewerProfile", did] as const;
@@ -23,12 +24,21 @@ export type ViewerProfileSlice = {
  */
 export function useViewerProfile() {
   const { session, getOAuthSession } = useAuth();
+  const demoMode = isLatrDemoDataEnabled();
   const did = session?.did ?? null;
 
   return useQuery({
     queryKey: VIEWER_PROFILE_QUERY_KEY(did ?? ""),
     queryFn: async (): Promise<ViewerProfileSlice | null> => {
       if (!did) return null;
+      if (demoMode) {
+        return {
+          did: DEMO_DID,
+          handle: DEMO_HANDLE,
+          displayName: "Demo Reader",
+          description: "Local L@tr demo account",
+        };
+      }
 
       const appViewAgent = new Agent(BSKY_APPVIEW_PUBLIC);
       try {
