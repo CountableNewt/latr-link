@@ -7,7 +7,6 @@ import { type ReactNode, useMemo, useState } from "react";
 import {
   Archive,
   Beaker,
-  ChevronDown,
   Inbox,
   LogOut,
   Menu,
@@ -192,11 +191,7 @@ function ProfileBlock({
           void signOut();
         }}
       >
-        {demoMode ? (
-          <ChevronDown className="size-4" aria-hidden strokeWidth={1.9} />
-        ) : (
-          <LogOut className="size-4" aria-hidden strokeWidth={1.9} />
-        )}
+        <LogOut className="size-4" aria-hidden strokeWidth={1.9} />
       </Button>
     </div>
   );
