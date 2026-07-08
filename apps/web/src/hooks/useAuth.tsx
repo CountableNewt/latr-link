@@ -77,12 +77,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const handleSignOut = useCallback(async () => {
     if (demoMode) {
       setSession({ did: DEMO_DID });
+      window.location.assign("/");
       return;
     }
     if (session) {
       await authSignOut(session.did);
       oauthSessionRef.current = null;
       setSession(null);
+      window.location.assign("/");
     }
   }, [demoMode, session]);
 

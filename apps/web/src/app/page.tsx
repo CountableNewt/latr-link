@@ -50,17 +50,6 @@ function SiteHeader() {
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <BrandLockup />
-        <nav
-          aria-label="Landing page"
-          className="hidden items-center gap-6 text-sm font-medium text-muted-foreground md:flex"
-        >
-          <Link href="#queue" className="hover:text-foreground">
-            Queue
-          </Link>
-          <Link href="#how-it-works" className="hover:text-foreground">
-            How It Works
-          </Link>
-        </nav>
         <div className="flex shrink-0 items-center gap-2">
           <Link
             href="/library"

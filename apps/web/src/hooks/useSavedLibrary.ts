@@ -89,7 +89,14 @@ export function useSavedLibraryMutations() {
       if (!repo && !demoMode) throw new Error("Sign In to Update Saved Items");
 
       const previous = queryClient.getQueryData<SavedRow[]>(queryKey);
-      patchRows((rows) => setSavedRowState(rows, itemRkey, state));
+      patchRows((rows) =>
+        setSavedRowState(
+          rows,
+          itemRkey,
+          state,
+          state === "archived" ? new Date().toISOString() : undefined
+        )
+      );
 
       if (demoMode) return;
       if (!repo) throw new Error("Sign In to Update Saved Items");

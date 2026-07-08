@@ -26,12 +26,9 @@ export default function ArchivePage() {
           <h1 className="text-3xl font-semibold leading-tight text-foreground">
             Archive
           </h1>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
-            Finished reads and reference links stay here when they leave your active queue.
-          </p>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
-          <SavedRows mode="archive" />
+          <SavedRows mode="archive" sort="archived" />
         </div>
       </section>
       <LibraryRightRail className="self-start xl:mt-[7rem]" />

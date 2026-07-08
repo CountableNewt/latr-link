@@ -114,7 +114,7 @@ export function filterSavedRows(
   });
 }
 
-export type SavedRowsSort = "newest" | "oldest" | "title";
+export type SavedRowsSort = "newest" | "oldest" | "title" | "archived";
 
 export function sortSavedRows(rows: SavedRow[], sort: SavedRowsSort): SavedRow[] {
   return [...rows].sort((a, b) => {
@@ -124,11 +124,15 @@ export function sortSavedRows(rows: SavedRow[], sort: SavedRowsSort): SavedRow[]
       });
     }
 
-    const aTime = Date.parse(a.rec.value.savedAt);
-    const bTime = Date.parse(b.rec.value.savedAt);
+    const aDate =
+      sort === "archived" ? (a.local?.archivedAt ?? a.rec.value.savedAt) : a.rec.value.savedAt;
+    const bDate =
+      sort === "archived" ? (b.local?.archivedAt ?? b.rec.value.savedAt) : b.rec.value.savedAt;
+    const aTime = Date.parse(aDate);
+    const bTime = Date.parse(bDate);
     const safeATime = Number.isFinite(aTime) ? aTime : 0;
     const safeBTime = Number.isFinite(bTime) ? bTime : 0;
-    return sort === "newest" ? safeBTime - safeATime : safeATime - safeBTime;
+    return sort === "oldest" ? safeATime - safeBTime : safeBTime - safeATime;
   });
 }
 

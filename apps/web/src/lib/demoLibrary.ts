@@ -20,7 +20,16 @@ type DemoSeed = {
   image?: string;
   kind?: SavedRow["preview"]["kind"];
   state?: SavedItemRecord["state"];
+  archivedAt?: string;
 };
+
+function localWithoutArchivedAt(row: SavedRow): SavedRow["local"] {
+  const local = row.local;
+  if (!local) return undefined;
+  const nextLocal = { ...local };
+  delete nextLocal.archivedAt;
+  return Object.keys(nextLocal).length > 0 ? nextLocal : undefined;
+}
 
 const demoSeeds: DemoSeed[] = [
   {
@@ -191,6 +200,7 @@ const demoSeeds: DemoSeed[] = [
     image:
       "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=320&q=80",
     state: "archived",
+    archivedAt: "2026-07-07T09:05:00.000Z",
   },
   {
     rkey: "neighborhood-parks",
@@ -204,6 +214,7 @@ const demoSeeds: DemoSeed[] = [
     image:
       "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=320&q=80",
     state: "archived",
+    archivedAt: "2026-07-07T08:24:00.000Z",
   },
   {
     rkey: "css-container-queries",
@@ -217,6 +228,7 @@ const demoSeeds: DemoSeed[] = [
     image:
       "https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=320&q=80",
     state: "archived",
+    archivedAt: "2026-07-06T16:42:00.000Z",
   },
   {
     rkey: "book-notes-archive",
@@ -230,6 +242,7 @@ const demoSeeds: DemoSeed[] = [
     image:
       "https://images.unsplash.com/photo-1519682337058-a94d519337bc?auto=format&fit=crop&w=320&q=80",
     state: "archived",
+    archivedAt: "2026-07-06T10:15:00.000Z",
   },
   {
     rkey: "atproto-record",
@@ -280,6 +293,7 @@ function rowFromSeed(seed: DemoSeed): SavedRow {
       siteLabel: seed.site,
       authorLabel: seed.author,
     },
+    local: seed.archivedAt ? { archivedAt: seed.archivedAt } : undefined,
   };
 }
 
@@ -321,16 +335,22 @@ export function readingMinutesForRow(row: SavedRow): number {
 export function setSavedRowState(
   rows: SavedRow[],
   itemRkey: string,
-  state: SavedItemState
+  state: SavedItemState,
+  archivedAt = demoNow
 ): SavedRow[] {
   return rows.map((row) => {
     if (rkeyFromAtUri(row.rec.uri) !== itemRkey) return row;
+    const nextLocal =
+      state === "archived"
+        ? { ...row.local, archivedAt }
+        : localWithoutArchivedAt(row);
     return {
       ...row,
       rec: {
         ...row.rec,
         value: { ...row.rec.value, state },
       },
+      local: nextLocal,
     };
   });
 }

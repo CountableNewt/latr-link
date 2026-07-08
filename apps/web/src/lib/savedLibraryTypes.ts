@@ -5,5 +5,7 @@ import type { SavedItemRecord } from "@/lib/latrRecords";
 export type SavedRow = {
   rec: RepoRecord<SavedItemRecord>;
   preview: ResolvedPreview;
+  local?: {
+    archivedAt?: string;
+  };
 };
-
