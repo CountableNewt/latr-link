@@ -14,7 +14,7 @@ import {
 import iconSrc from "@/app/icon.png";
 import { BrandLockup } from "@/components/BrandLockup";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type Feature = {
@@ -111,7 +111,9 @@ function ProductPreview() {
             <Link2 className="size-4 text-primary" aria-hidden strokeWidth={1.9} />
             Save a Link or AT URI
           </div>
-          <Button type="button">Save</Button>
+          <span className={buttonVariants()} aria-hidden="true">
+            Save
+          </span>
         </div>
       </div>
       <div className="divide-y divide-border">

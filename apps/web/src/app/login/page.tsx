@@ -145,7 +145,9 @@ export default function LoginPage() {
               </div>
 
               {displayError ? (
-                <p className="text-sm text-destructive">{displayError}</p>
+                <p className="text-sm text-destructive" role="alert">
+                  {displayError}
+                </p>
               ) : null}
 
               <Button

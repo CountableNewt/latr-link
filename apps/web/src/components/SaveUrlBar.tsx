@@ -119,13 +119,17 @@ export function SaveUrlBar() {
             enterKeyHint="done"
           />
         </div>
-        <Button type="submit" disabled={busy || !paste.trim() || (!repo && !demoMode)}>
+        <Button
+          type="submit"
+          disabled={busy || !paste.trim() || (!repo && !demoMode)}
+          className="w-full sm:w-auto"
+        >
           {busy ? "Saving…" : "Save"}
         </Button>
       </form>
       {feedback &&
         (feedback.mode === "debug" ? (
-          <div className="pt-3">
+          <div className="pt-3" role="status" aria-live="polite">
             <span className={savePathDebugChip} title="Save Pathway (Dev)">
               <span className="shrink-0 font-mono text-[10px] font-semibold uppercase tracking-wide opacity-95">
                 [DEBUG]
@@ -136,7 +140,7 @@ export function SaveUrlBar() {
             </span>
           </div>
         ) : (
-          <p className="pt-3 text-xs text-muted-foreground">
+          <p className="pt-3 text-xs text-muted-foreground" role="status" aria-live="polite">
             {feedback.text}
           </p>
         ))}

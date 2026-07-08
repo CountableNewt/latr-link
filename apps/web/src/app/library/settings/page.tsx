@@ -304,7 +304,9 @@ export default function SettingsPage() {
             Download JSON
           </Button>
           {message ? (
-            <p className="mt-3 text-sm text-muted-foreground">{message}</p>
+            <p className="mt-3 text-sm text-muted-foreground" role="status" aria-live="polite">
+              {message}
+            </p>
           ) : null}
         </section>
 

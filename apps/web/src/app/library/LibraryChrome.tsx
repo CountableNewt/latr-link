@@ -36,6 +36,7 @@ import { DEMO_HANDLE, isLatrDemoDataEnabled } from "@/lib/demoMode";
 import { cn } from "@/lib/utils";
 
 const LIBRARY_NAV_ID = "library-primary-nav";
+const LIBRARY_MOBILE_NAV_ID = "library-mobile-nav";
 
 type NavItem = {
   href: string;
@@ -71,16 +72,24 @@ function useLibraryNav(): NavItem[] {
 }
 
 function SidebarNav({
+  id = LIBRARY_NAV_ID,
+  mobile = false,
   pathname,
   onNavigate,
 }: {
+  id?: string;
+  mobile?: boolean;
   pathname: string;
   onNavigate?: () => void;
 }) {
   const nav = useLibraryNav();
 
   return (
-    <nav id={LIBRARY_NAV_ID} className="flex flex-col gap-0.5" aria-label="Library">
+    <nav
+      id={id}
+      className={cn("flex flex-col", mobile ? "gap-1.5" : "gap-0.5")}
+      aria-label="Library"
+    >
       {nav.map((item) => {
         const active = pathname === item.href;
         return (
@@ -89,7 +98,8 @@ function SidebarNav({
             href={item.href}
             onClick={onNavigate}
             className={cn(
-              "flex h-9 items-center gap-2.5 rounded-md px-2.5 text-sm font-medium transition-colors",
+              "flex items-center gap-2.5 rounded-md font-medium transition-colors",
+              mobile ? "min-h-11 px-3 text-base" : "h-9 px-2.5 text-sm",
               active
                 ? "bg-accent text-accent-foreground"
                 : "text-muted-foreground hover:bg-accent/70 hover:text-accent-foreground"
@@ -100,7 +110,8 @@ function SidebarNav({
             {typeof item.count === "number" ? (
               <span
                 className={cn(
-                  "text-sm font-semibold tabular-nums",
+                  "font-semibold tabular-nums",
+                  mobile ? "text-base" : "text-sm",
                   active ? "text-primary" : "text-muted-foreground"
                 )}
               >
@@ -114,21 +125,26 @@ function SidebarNav({
   );
 }
 
-function SidebarBrand() {
+function SidebarBrand({ mobile = false }: { mobile?: boolean }) {
   return (
     <BrandLockup
       href="/library"
-      iconSize={30}
-      className="px-2 py-1"
-      textClassName="text-xl"
+      iconSize={mobile ? 28 : 30}
+      className={cn("px-2 py-1", mobile && "min-w-0 flex-1")}
+      textClassName={mobile ? "text-lg" : "text-xl"}
     />
   );
 }
 
-function DemoStatus() {
+function DemoStatus({ mobile = false }: { mobile?: boolean }) {
   if (!isLatrDemoDataEnabled()) return null;
   return (
-    <div className="rounded-lg border border-primary/15 bg-accent p-2.5 text-sm">
+    <div
+      className={cn(
+        "rounded-lg border border-primary/15 bg-accent text-sm",
+        mobile ? "p-3" : "p-2.5"
+      )}
+    >
       <div className="flex items-center gap-2 font-medium text-primary">
         <Beaker className="size-4" aria-hidden strokeWidth={1.9} />
         <span>Local Data Mode</span>
@@ -143,8 +159,10 @@ function DemoStatus() {
 
 function ProfileBlock({
   closeMobileNav,
+  mobile = false,
 }: {
   closeMobileNav?: () => void;
+  mobile?: boolean;
 }) {
   const { session, signOut } = useAuth();
   const { data: profile, isLoading } = useViewerProfile();
@@ -165,15 +183,25 @@ function ProfileBlock({
   if (isLoading && session?.did) return <ProfileSkeleton />;
 
   return (
-    <div className="flex min-w-0 items-center gap-2 rounded-lg px-1.5 py-1">
+    <div
+      className={cn(
+        "flex min-w-0 items-center gap-2 rounded-lg",
+        mobile ? "px-2 py-2" : "px-1.5 py-1"
+      )}
+    >
       <UserAvatar
         src={profile?.avatar}
         alt={avatarAlt}
-        size={36}
+        size={mobile ? 40 : 36}
         className="shrink-0"
       />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold leading-tight text-foreground">
+        <p
+          className={cn(
+            "truncate font-semibold leading-tight text-foreground",
+            mobile ? "text-base" : "text-sm"
+          )}
+        >
           {primaryLine}
         </p>
         <p className="truncate text-xs leading-tight text-muted-foreground">
@@ -186,6 +214,7 @@ function ProfileBlock({
         size="icon"
         aria-label="Sign Out"
         title="Sign Out"
+        className={cn(mobile && "size-10")}
         onClick={() => {
           closeMobileNav?.();
           void signOut();
@@ -197,17 +226,38 @@ function ProfileBlock({
   );
 }
 
-function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
+function SidebarBody({
+  mobile = false,
+  onNavigate,
+  headerAction,
+}: {
+  mobile?: boolean;
+  onNavigate?: () => void;
+  headerAction?: ReactNode;
+}) {
   const pathname = usePathname();
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3 p-3">
-      <SidebarBrand />
-      <SidebarNav pathname={pathname} onNavigate={onNavigate} />
-      <div className="mt-auto flex flex-col gap-3">
-        <DemoStatus />
+    <div
+      className={cn(
+        "flex h-full min-h-0 flex-col",
+        mobile ? "gap-4 p-4" : "gap-3 p-3"
+      )}
+    >
+      <div className="flex min-w-0 items-center justify-between gap-3">
+        <SidebarBrand mobile={mobile} />
+        {headerAction}
+      </div>
+      <SidebarNav
+        id={mobile ? LIBRARY_MOBILE_NAV_ID : LIBRARY_NAV_ID}
+        mobile={mobile}
+        pathname={pathname}
+        onNavigate={onNavigate}
+      />
+      <div className={cn("mt-auto flex flex-col", mobile ? "gap-4" : "gap-3")}>
+        <DemoStatus mobile={mobile} />
         <Separator />
-        <ProfileBlock closeMobileNav={onNavigate} />
+        <ProfileBlock closeMobileNav={onNavigate} mobile={mobile} />
       </div>
     </div>
   );
@@ -223,7 +273,7 @@ export function LibraryChrome({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between border-b border-border bg-background/95 px-4 backdrop-blur lg:hidden">
+        <header className="sticky top-0 z-[80] flex h-14 shrink-0 items-center justify-between border-b border-border bg-background/95 px-4 backdrop-blur lg:hidden">
           <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
             <SheetTrigger asChild>
               <Button
@@ -231,24 +281,37 @@ export function LibraryChrome({ children }: { children: ReactNode }) {
                 variant="ghost"
                 size="icon"
                 aria-expanded={mobileNavOpen}
-                aria-controls={LIBRARY_NAV_ID}
+                aria-controls={LIBRARY_MOBILE_NAV_ID}
                 aria-label="Open Menu"
               >
                 <Menu className="size-5" aria-hidden strokeWidth={2} />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-80 p-0">
+            <SheetContent
+              side="left"
+              className="w-[19rem] max-w-[calc(100vw-1rem)] p-0"
+              aria-label="Library Navigation"
+            >
               <SheetHeader className="sr-only">
                 <SheetTitle>Library Navigation</SheetTitle>
               </SheetHeader>
-              <div className="absolute right-3 top-3 z-10">
-                <SheetClose asChild>
-                  <Button type="button" variant="ghost" size="icon" aria-label="Close Menu">
-                    <X className="size-5" aria-hidden strokeWidth={2} />
-                  </Button>
-                </SheetClose>
-              </div>
-              <SidebarBody onNavigate={() => setMobileNavOpen(false)} />
+              <SidebarBody
+                mobile
+                onNavigate={() => setMobileNavOpen(false)}
+                headerAction={
+                  <SheetClose asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-10"
+                      aria-label="Close Menu"
+                    >
+                      <X className="size-5" aria-hidden strokeWidth={2} />
+                    </Button>
+                  </SheetClose>
+                }
+              />
             </SheetContent>
           </Sheet>
           <BrandLockup

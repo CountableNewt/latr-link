@@ -289,7 +289,7 @@ function SavedRowItem({
   }
 
   return (
-    <li className="group relative grid gap-3 p-2.5 transition-colors hover:bg-accent/25 sm:grid-cols-[6rem_minmax(0,1fr)]">
+    <li className="group relative grid gap-3 p-2.5 pb-12 transition-colors hover:bg-accent/25 sm:grid-cols-[6rem_minmax(0,1fr)] sm:pb-2.5">
       <button
         type="button"
         aria-label={openLabel}
@@ -318,7 +318,7 @@ function SavedRowItem({
           <SavedLinkThumbnailPlaceholder kind={p.kind} />
         )}
       </div>
-      <div className="relative z-10 flex min-w-0 flex-col gap-1.5 pr-26 pointer-events-none">
+      <div className="relative z-10 flex min-w-0 flex-col gap-1.5 pointer-events-none sm:pr-26">
         <div className="flex min-w-0 items-start gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
@@ -381,16 +381,16 @@ function SavedRowItem({
           </span>
         </div>
       ) : null}
-      <div className="absolute bottom-2.5 right-2.5 z-10 flex shrink-0 items-center gap-0.5 pointer-events-auto">
+      <div className="absolute bottom-2 right-2 z-10 flex shrink-0 items-center gap-1 pointer-events-auto sm:bottom-2.5 sm:right-2.5 sm:gap-0.5">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              aria-label="Open"
-              title="Open"
-              className="size-8"
+              aria-label={`Open ${p.title}`}
+              title={`Open ${p.title}`}
+              className="size-9 sm:size-8"
               onClick={(e) => activateSavedHref(href, p.title, onOpenEmbedded, e)}
             >
               <ExternalLink className="size-4" aria-hidden strokeWidth={1.9} />
@@ -407,9 +407,9 @@ function SavedRowItem({
                   variant="ghost"
                   size="icon"
                   disabled={busy}
-                  aria-label={isArchived ? "Unarchive" : "Archive"}
-                  title={isArchived ? "Unarchive" : "Archive"}
-                  className="size-8"
+                  aria-label={`${isArchived ? "Unarchive" : "Archive"} ${p.title}`}
+                  title={`${isArchived ? "Unarchive" : "Archive"} ${p.title}`}
+                  className="size-9 sm:size-8"
                   onClick={async () => {
                     if (busy) return;
                     setBusy(true);
@@ -439,9 +439,9 @@ function SavedRowItem({
                   variant="ghost"
                   size="icon"
                   disabled={busy}
-                  aria-label="Remove From Library"
-                  title="Remove From Library"
-                  className="size-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  aria-label={`Remove ${p.title} From Library`}
+                  title={`Remove ${p.title} From Library`}
+                  className="size-9 text-destructive hover:bg-destructive/10 hover:text-destructive sm:size-8"
                   onClick={(event) => openRemoveDialog(event.currentTarget)}
                 >
                   <Trash2 className="size-4" aria-hidden strokeWidth={1.9} />
