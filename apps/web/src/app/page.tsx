@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import iconSrc from "@/app/icon.png";
+import { BrandLockup } from "@/components/BrandLockup";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -48,20 +49,7 @@ function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-        <Link href="/" className="flex min-w-0 items-center gap-2">
-          <Image
-            src={iconSrc}
-            alt=""
-            width={32}
-            height={32}
-            className="shrink-0 rounded-lg"
-            priority
-          />
-          <span className="truncate text-xl font-semibold text-primary">
-            L@tr.link
-          </span>
-          <Badge variant="secondary">Beta</Badge>
-        </Link>
+        <BrandLockup />
         <nav
           aria-label="Landing page"
           className="hidden items-center gap-6 text-sm font-medium text-muted-foreground md:flex"

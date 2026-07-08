@@ -135,18 +135,19 @@ export default function SettingsPage() {
   if (!session) return null;
 
   return (
-    <main className="mx-auto w-full max-w-[760px] px-4 pb-6 pt-2 sm:px-6 lg:px-8">
-      <header className="mb-6">
-        <h1 className="text-3xl font-semibold leading-tight text-foreground">
-          Settings
-        </h1>
-      </header>
+    <main className="h-full overflow-y-auto overscroll-contain">
+      <div className="mx-auto w-full max-w-[760px] px-4 pb-6 pt-2 sm:px-6 lg:px-8">
+        <header className="mb-6">
+          <h1 className="text-3xl font-semibold leading-tight text-foreground">
+            Settings
+          </h1>
+        </header>
 
-      <div className="flex flex-col gap-5">
-        <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
-          <div className="flex flex-col gap-1">
-            <h2 className="text-base font-semibold text-foreground">Appearance</h2>
-          </div>
+        <div className="flex flex-col gap-5">
+          <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-base font-semibold text-foreground">Appearance</h2>
+            </div>
 
           <div className="mt-5 grid gap-4">
             <div>
@@ -347,6 +348,7 @@ export default function SettingsPage() {
             </p>
           </section>
         ) : null}
+      </div>
       </div>
     </main>
   );

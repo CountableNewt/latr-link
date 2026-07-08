@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useMemo, useState } from "react";
@@ -16,10 +15,9 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import iconSrc from "@/app/icon.png";
 
+import { BrandLockup } from "@/components/BrandLockup";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
   Sheet,
@@ -119,19 +117,12 @@ function SidebarNav({
 
 function SidebarBrand() {
   return (
-    <Link href="/library" className="flex min-w-0 items-center gap-2 px-2 py-1">
-      <Image
-        src={iconSrc}
-        alt=""
-        width={30}
-        height={30}
-        className="shrink-0 rounded-lg"
-        priority
-      />
-      <span className="truncate text-xl font-semibold leading-none text-primary">
-        L@tr.link
-      </span>
-    </Link>
+    <BrandLockup
+      href="/library"
+      iconSize={30}
+      className="px-2 py-1"
+      textClassName="text-xl"
+    />
   );
 }
 
@@ -265,17 +256,11 @@ export function LibraryChrome({ children }: { children: ReactNode }) {
               <SidebarBody onNavigate={() => setMobileNavOpen(false)} />
             </SheetContent>
           </Sheet>
-          <div className="flex min-w-0 items-center gap-2">
-            <Image src={iconSrc} alt="" width={24} height={24} className="rounded-md" />
-            <span className="truncate text-sm font-semibold text-foreground">
-              L@tr.link
-            </span>
-            {isLatrDemoDataEnabled() ? (
-              <Badge variant="secondary" className="text-[10px]">
-                Demo
-              </Badge>
-            ) : null}
-          </div>
+          <BrandLockup
+            href="/library"
+            iconSize={24}
+            textClassName="text-sm"
+          />
           <Link
             href="/library/settings"
             className={buttonVariants({ variant: "outline", size: "sm" })}
@@ -284,7 +269,7 @@ export function LibraryChrome({ children }: { children: ReactNode }) {
           </Link>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-hidden">
           <EmbeddedReaderPortal>{children}</EmbeddedReaderPortal>
         </div>
       </div>

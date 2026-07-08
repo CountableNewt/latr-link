@@ -47,9 +47,9 @@ export default function LibraryPage() {
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-[1180px] gap-6 px-4 pb-6 pt-2 sm:px-6 lg:px-8">
-      <section className="min-w-0 flex-1 xl:max-w-[760px]">
-        <header className="sticky top-0 z-20 -mx-4 mb-5 flex flex-col gap-4 border-b border-border bg-background/95 px-4 pb-4 pt-1 backdrop-blur sm:-mx-6 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:-mx-8 lg:px-8">
+    <main className="mx-auto flex h-full min-h-0 w-full max-w-[1180px] gap-6 overflow-hidden px-4 pb-6 pt-2 sm:px-6 lg:px-8">
+      <section className="flex min-h-0 min-w-0 flex-1 flex-col xl:max-w-[760px]">
+        <header className="-mx-4 mb-5 flex shrink-0 flex-col gap-4 border-b border-border bg-background/95 px-4 pb-4 pt-1 backdrop-blur sm:-mx-6 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:-mx-8 lg:px-8">
           <div className="min-w-0">
             <h1 className="text-3xl font-semibold leading-tight text-foreground">
               Unread
@@ -94,14 +94,16 @@ export default function LibraryPage() {
             </DropdownMenuContent>
           </DropdownMenu>
         </header>
-        <div className="flex flex-col gap-5">
+        <div className="shrink-0 pb-5">
           <SaveUrlBar />
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
           <SavedRows mode="unread" filter={filter} sort={sort} />
         </div>
       </section>
       <LibraryRightRail
         activeFilter={filter}
-        className="sticky top-6 self-start xl:mt-[4.75rem]"
+        className="self-start xl:mt-[4.75rem]"
         onFilterChange={setFilter}
       />
     </main>
