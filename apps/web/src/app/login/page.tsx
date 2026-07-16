@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { ArrowRight, BookOpen, ShieldCheck } from "lucide-react";
+import { ArrowRight, BookOpen } from "lucide-react";
 
 import { BrandLockup } from "@/components/BrandLockup";
 import { Button } from "@/components/ui/button";
@@ -87,12 +87,6 @@ export default function LoginPage() {
               <BookOpen className="size-5 text-primary" aria-hidden strokeWidth={1.9} />
               <span className="text-sm font-medium text-foreground">
                 Articles, Posts, and Records in One Queue
-              </span>
-            </div>
-            <div className="flex items-center gap-3 rounded-lg border border-border bg-background p-4">
-              <ShieldCheck className="size-5 text-primary" aria-hidden strokeWidth={1.9} />
-              <span className="text-sm font-medium text-foreground">
-                OAuth Sign-In with Protocol-Scoped Access
               </span>
             </div>
           </div>

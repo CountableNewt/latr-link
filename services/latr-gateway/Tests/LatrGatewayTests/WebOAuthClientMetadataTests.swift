@@ -29,7 +29,10 @@ final class WebOAuthClientMetadataTests: XCTestCase {
             ["https://testing.latr.link/callback"]
         )
         XCTAssertEqual(obj?["scope"] as? String, ATProtoOAuthScopes.scope)
-        XCTAssertEqual(obj?["client_uri"] as? String, "https://testing.latr.link")
-        XCTAssertEqual(obj?["logo_uri"] as? String, "https://testing.latr.link/icon.png")
+        XCTAssertEqual(
+            obj?["client_uri"] as? String,
+            "https://latr-link-dev-gateway.fly.dev"
+        )
+        XCTAssertNil(obj?["logo_uri"])
     }
 }

@@ -20,8 +20,8 @@ final class ExtensionOAuthClientMetadataTests: XCTestCase {
             ["https://testing.latr.link/extension/callback"]
         )
         XCTAssertEqual(object["scope"] as? String, ATProtoOAuthScopes.scope)
-        XCTAssertEqual(object["client_uri"] as? String, "https://testing.latr.link")
-        XCTAssertEqual(object["logo_uri"] as? String, "https://testing.latr.link/icon.png")
+        XCTAssertEqual(object["client_uri"] as? String, "https://api.testing.latr.link")
+        XCTAssertNil(object["logo_uri"])
         XCTAssertEqual(object["software_id"] as? String, "latr-extension")
     }
 }

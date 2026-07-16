@@ -39,7 +39,6 @@ public enum WebOAuthClientMetadata {
             let dpop_bound_access_tokens: Bool
             let client_name: String
             let client_uri: String
-            let logo_uri: String
         }
 
         let doc = MetadataBody(
@@ -52,8 +51,7 @@ public enum WebOAuthClientMetadata {
             token_endpoint_auth_method: "none",
             dpop_bound_access_tokens: true,
             client_name: "L@tr.link",
-            client_uri: redirectBase,
-            logo_uri: "\(redirectBase)/icon.png"
+            client_uri: metadataBase
         )
         let enc = JSONEncoder()
         enc.outputFormatting = [.sortedKeys]
