@@ -3,6 +3,17 @@ import LatrGatewayLib
 import XCTest
 
 final class WebOAuthClientMetadataTests: XCTestCase {
+    func testOAuthScopesMatchTheExactRepositoryMutations() {
+        XCTAssertEqual(
+            ATProtoOAuthScopes.scope,
+            "atproto "
+                + "repo:link.latr.saved.external?action=create&action=update "
+                + "repo:link.latr.saved.item?action=create&action=update&action=delete "
+                + "repo:com.latr.saved.external?action=delete "
+                + "repo:com.latr.saved.item?action=delete"
+        )
+    }
+
     func testBuildsGatewayMetadataWithSeparateRedirectOrigin() throws {
         let data = try WebOAuthClientMetadata.buildJSON(
             publicOrigin: "https://latr-link-dev-gateway.fly.dev",
@@ -18,5 +29,7 @@ final class WebOAuthClientMetadataTests: XCTestCase {
             ["https://testing.latr.link/callback"]
         )
         XCTAssertEqual(obj?["scope"] as? String, ATProtoOAuthScopes.scope)
+        XCTAssertEqual(obj?["client_uri"] as? String, "https://testing.latr.link")
+        XCTAssertEqual(obj?["logo_uri"] as? String, "https://testing.latr.link/icon.png")
     }
 }

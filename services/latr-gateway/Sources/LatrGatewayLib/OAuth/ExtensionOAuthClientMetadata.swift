@@ -31,6 +31,7 @@ public enum ExtensionOAuthClientMetadata {
             let dpop_bound_access_tokens: Bool
             let client_name: String
             let client_uri: String
+            let logo_uri: String
             let software_id: String
         }
 
@@ -45,6 +46,7 @@ public enum ExtensionOAuthClientMetadata {
             dpop_bound_access_tokens: true,
             client_name: "L@tr.link Extension",
             client_uri: redirectBase,
+            logo_uri: "\(redirectBase)/icon.png",
             software_id: "latr-extension"
         )
         let encoder = JSONEncoder()
