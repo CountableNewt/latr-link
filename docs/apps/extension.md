@@ -42,8 +42,8 @@ bun run --cwd apps/extension dev:firefox
 
 Load the unpacked build shown by WXT:
 
-- Chrome: `apps/extension/.output/chrome-mv3` from `chrome://extensions` with Developer mode enabled.
-- Firefox: load `apps/extension/.output/firefox-mv2/manifest.json` temporarily from `about:debugging#/runtime/this-firefox`.
+- Chrome: `apps/extension/.output/chrome-mv3-dev` from `chrome://extensions` with Developer mode enabled.
+- Firefox: load `apps/extension/.output/firefox-mv2-dev/manifest.json` temporarily from `about:debugging#/runtime/this-firefox`.
 
 Firefox uses the stable add-on ID `latr-link@stygian.tech`, requires Firefox 140+, and declares required transmission of authentication information and browsing activity. The latter covers URLs explicitly saved to the user’s L@tr.link library.
 
@@ -55,12 +55,21 @@ bun run --cwd apps/extension build:firefox
 bun run --cwd apps/extension build:safari   # macOS + Xcode for distribution
 ```
 
-Zip artifacts for store upload:
+These builds use your local environment configuration. For verified Production ZIP artifacts for store upload, use Bun 1.3.14 and run from the repository root:
 
 ```bash
-bun run --cwd apps/extension zip:chromium
-bun run --cwd apps/extension zip:firefox
+bun run --cwd apps/extension package:stores
 ```
+
+This runs extension tests and typechecking, builds both browsers in isolated store mode, and validates the bundles and archives. No local gateway API key is required. See [store build details](../../apps/extension/store/BUILD.md).
+
+- **Chrome Web Store:** upload `apps/extension/.output/store/latr-link-<version>-chrome-store.zip` (version comes from `apps/extension/package.json`). The ZIP contains `manifest.json` at its root, as required by the [Chrome Web Store](https://developer.chrome.com/docs/webstore/prepare).
+- **Local Chrome installation:** enable Developer mode at `chrome://extensions`, choose **Load unpacked**, and select `apps/extension/.output/chrome-mv3-store`.
+- **Chrome's Pack extension dialog:** select that same compiled `chrome-mv3-store` directory as the extension root. The source directory `apps/extension` does not contain the generated manifest. The Web Store upload uses the ZIP produced above.
+
+On macOS, `.output` is hidden in file pickers. Press **Command-Shift-G** and enter the full path to the compiled directory to select it directly.
+
+The generic `zip:chromium` and `zip:firefox` commands use your local environment configuration; use `package:stores` for store submissions.
 
 ## Environment variables
 
