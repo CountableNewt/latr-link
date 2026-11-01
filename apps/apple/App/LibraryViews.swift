@@ -3,7 +3,7 @@ import SafariServices
 import LatrNativeCore
 
 enum LibrarySection: String, CaseIterable, Identifiable {
-    case unread = "Unread", archive = "Archive", pending = "Pending saves", tags = "Tags", settings = "Settings"
+    case unread, archive, pending, tags, settings
     var id: String { rawValue }
     var icon: String {
         switch self {
@@ -14,18 +14,34 @@ enum LibrarySection: String, CaseIterable, Identifiable {
 }
 
 enum ContentFilter: String, CaseIterable, Identifiable {
-    case all = "All", article = "Articles", social = "Social", other = "Other"
+    case all, article, social, other
     var id: String { rawValue }
+    var title: LocalizedStringResource {
+        switch self {
+        case .all: "All"
+        case .article: "Articles"
+        case .social: "Social"
+        case .other: "Other"
+        }
+    }
 }
 
 enum LibrarySort: String, CaseIterable, Identifiable {
-    case newest = "Newest first", oldest = "Oldest first", title = "Title", archived = "Recently archived"
+    case newest, oldest, title, archived
     var id: String { rawValue }
+    var titleResource: LocalizedStringResource {
+        switch self {
+        case .newest: "Newest first"
+        case .oldest: "Oldest first"
+        case .title: "Title"
+        case .archived: "Recently archived"
+        }
+    }
 }
 
 struct RootView: View {
     @Bindable var model: AppModel
-    @State private var selection: LibrarySection? = .unread
+    @State private var selection: LibrarySection = .unread
     @State private var showSave = false
     @State private var filterTag: Data?
 
@@ -33,33 +49,38 @@ struct RootView: View {
         Group {
             if model.session == nil { LoginView(model: model) }
             else {
-                NavigationSplitView {
-                    List(selection: $selection) {
-                        Section("Library") {
-                            ForEach(LibrarySection.allCases) { section in
-                                NavigationLink(value: section) { Label(section.rawValue, systemImage: section.icon) }.accessibilityIdentifier("sidebar.\(section.rawValue)")
-                            }
+                TabView(selection: $selection) {
+                    Tab("Unread", systemImage: LibrarySection.unread.icon, value: .unread) {
+                        AppTabNavigation(showSave: $showSave) {
+                            LibraryView(model: model, archived: false, filterTag: $filterTag)
                         }
-                        if let session = model.session {
-                            Section("Account") {
-                                Text(session.handle ?? session.did).font(.caption).textSelection(.enabled)
+                    }
+                    Tab("Archive", systemImage: LibrarySection.archive.icon, value: .archive) {
+                        AppTabNavigation(showSave: $showSave) {
+                            LibraryView(model: model, archived: true, filterTag: $filterTag)
+                        }
+                    }
+                    Tab("Pending", systemImage: LibrarySection.pending.icon, value: .pending) {
+                        AppTabNavigation(showSave: $showSave) {
+                            PendingSavesView(model: model)
+                        }
+                    }
+                    Tab("Tags", systemImage: LibrarySection.tags.icon, value: .tags) {
+                        AppTabNavigation(showSave: $showSave) {
+                            TagsView(model: model) { tag in
+                                filterTag = Data(tag.utf8)
+                                selection = .unread
                             }
                         }
                     }
-                    .navigationTitle("L@tr.link")
-                    
-                } detail: {
-                    NavigationStack {
-                        Group { switch selection ?? .unread {
-                        case .unread, .archive:
-                            LibraryView(model: model, archived: selection == .archive, filterTag: $filterTag)
-                        case .pending: PendingSavesView(model: model)
-                        case .tags: TagsView(model: model) { tag in filterTag = Data(tag.utf8); selection = .unread }
-                        case .settings: SettingsView(model: model)
-                        } }
-                        .toolbar { Button("Save link", systemImage: "plus") { showSave = true }.keyboardShortcut("n") }
+                    Tab("Settings", systemImage: LibrarySection.settings.icon, value: .settings) {
+                        AppTabNavigation(showSave: $showSave) {
+                            SettingsView(model: model)
+                        }
                     }
                 }
+                .tabViewStyle(.sidebarAdaptable)
+                .defaultAdaptableTabBarPlacement(.tabBar)
             }
         }
         .sheet(isPresented: $showSave) { SaveLinkView(model: model) }
@@ -74,6 +95,28 @@ struct RootView: View {
                     Button("Dismiss", systemImage: "xmark") { model.notice = nil }.labelStyle(.iconOnly)
                 }.padding().background(.regularMaterial)
             }
+        }
+    }
+}
+
+private struct AppTabNavigation<Content: View>: View {
+    @Binding var showSave: Bool
+    let content: Content
+
+    init(showSave: Binding<Bool>, @ViewBuilder content: () -> Content) {
+        _showSave = showSave
+        self.content = content()
+    }
+
+    var body: some View {
+        NavigationStack {
+            content
+                .toolbar {
+                    Button("Save link", systemImage: "plus") {
+                        showSave = true
+                    }
+                    .keyboardShortcut("n")
+                }
         }
     }
 }
@@ -120,13 +163,27 @@ struct LibraryView: View {
     @State private var deleting: BookmarkSelection?
     @State private var browser: BrowserDestination?
     @State private var unavailable: String?
+    @State private var filteredBookmarks: [BookmarkView] = []
     @Environment(\.openURL) private var openURL
 
-    private var filtered: [BookmarkView] {
-        model.bookmarks.filter { bookmark in
+    private var filterKey: LibraryFilterKey {
+        LibraryFilterKey(
+            archived: archived,
+            filter: filter,
+            filterTag: filterTag,
+            search: search,
+            sort: sort,
+            bookmarksRevision: model.bookmarksRevision
+        )
+    }
+
+    private func updateFilteredBookmarks() {
+        filteredBookmarks = model.bookmarks.filter { bookmark in
             bookmark.isArchived == archived &&
             (filter == .all || bookmark.contentFilter == filter) &&
-            (filterTag == nil || (bookmark.value.tags ?? []).contains(where: { Data($0.utf8) == filterTag! })) &&
+            (filterTag.map { selectedTag in
+                (bookmark.value.tags ?? []).contains { Data($0.utf8) == selectedTag }
+            } ?? true) &&
             (search.isEmpty || bookmark.displayTitle.localizedCaseInsensitiveContains(search) || bookmark.value.subject.localizedCaseInsensitiveContains(search))
         }.sorted { a, b in
             switch sort {
@@ -141,13 +198,15 @@ struct LibraryView: View {
     var body: some View {
         List {
             Section {
-                Picker("Content", selection: $filter) { ForEach(ContentFilter.allCases) { Text($0.rawValue).tag($0) } }.pickerStyle(.segmented)
+                Picker("Content", selection: $filter) { ForEach(ContentFilter.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
                 if let filterTag {
                     HStack { Label(String(decoding: filterTag, as: UTF8.self), systemImage: "tag"); Spacer(); Button("Clear filter") { self.filterTag = nil } }
                 }
-                Text("\(filtered.count) \(archived ? "archived" : "unread") · about \(filtered.reduce(0) { $0 + $1.readingMinutes }) min of reading").font(.caption).foregroundStyle(.secondary)
+                Text("\(filteredBookmarks.count) saved links · about \(filteredBookmarks.reduce(0) { $0 + $1.readingMinutes }) min of reading")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-            ForEach(Array(filtered.prefix(visibleCount)), id: \.uri) { bookmark in
+            ForEach(filteredBookmarks.prefix(visibleCount), id: \.uri) { bookmark in
                 Button { open(bookmark) } label: { BookmarkRow(bookmark: bookmark) }.buttonStyle(.plain)
                     .contextMenu {
                         Button(archived ? "Move to unread" : "Archive", systemImage: archived ? "tray.and.arrow.up" : "archivebox") { changeState(bookmark) }
@@ -170,22 +229,23 @@ struct LibraryView: View {
                             .accessibilityIdentifier("bookmark-tags-action")
                     }
             }
-            if visibleCount < filtered.count || model.cursor != nil {
+            if visibleCount < filteredBookmarks.count || model.cursor != nil {
                 Button(model.loadingMore ? "Loading…" : "Load more") {
-                    if visibleCount >= filtered.count { Task { await model.loadMore(); visibleCount += 40 } }
+                    if visibleCount >= filteredBookmarks.count { Task { await model.loadMore(); visibleCount += 40 } }
                     else { visibleCount += 40 }
                 }.disabled(model.loadingMore)
             }
-            if filtered.isEmpty && !model.loading {
+            if filteredBookmarks.isEmpty && !model.loading {
                 ContentUnavailableView(search.isEmpty ? "Nothing here yet" : "No matching links", systemImage: archived ? "archivebox" : "bookmark", description: Text("Save a link from the share sheet or the + button."))
             }
             if model.loading { ProgressView("Loading library…") }
         }
         .navigationTitle(archived ? "Archive" : "Unread")
         .searchable(text: $search, prompt: "Search saved links")
+        .task(id: filterKey) { updateFilteredBookmarks() }
         .refreshable { await model.refresh() }
         .toolbar {
-            Menu("Sort", systemImage: "arrow.up.arrow.down") { Picker("Sort", selection: $sort) { ForEach(LibrarySort.allCases) { Text($0.rawValue).tag($0) } } }
+            Menu("Sort", systemImage: "arrow.up.arrow.down") { Picker("Sort", selection: $sort) { ForEach(LibrarySort.allCases) { Text($0.titleResource).tag($0) } } }
         }
         .sheet(item: $editing) { EditBookmarkTagsView(model: model, bookmark: $0.bookmark) }
         .sheet(item: $browser) { SafariView(url: $0.url).ignoresSafeArea() }
@@ -228,8 +288,12 @@ private struct BookmarkRow: View {
                 Text(bookmark.displayTitle).font(.headline).lineLimit(3)
                 if let description = bookmark.preview?.description, !description.isEmpty { Text(description).font(.subheadline).foregroundStyle(.secondary).lineLimit(2) }
                 Text(URL(string: bookmark.value.subject)?.host ?? bookmark.value.subject).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                Text("\(bookmark.contentFilter.rawValue) · \(bookmark.readingMinutes) min").font(.caption2).foregroundStyle(.secondary)
-                if !(bookmark.value.tags ?? []).isEmpty { Text((bookmark.value.tags ?? []).map { "#\($0)" }.joined(separator: "  ")).font(.caption).foregroundStyle(.blue) }
+                Text("\(bookmark.contentFilter.title) · \(bookmark.readingMinutes) min").font(.caption2).foregroundStyle(.secondary)
+                if !(bookmark.value.tags ?? []).isEmpty {
+                    Text((bookmark.value.tags ?? []).map { "#\($0)" }.formatted())
+                        .font(.caption)
+                        .foregroundStyle(.blue)
+                }
             }.frame(maxWidth: .infinity, alignment: .leading)
             if let image = bookmark.preview?.image, let url = URL(string: image) {
                 AsyncImage(url: url) { image in image.resizable().scaledToFill() } placeholder: { Color.secondary.opacity(0.1) }
@@ -241,6 +305,14 @@ private struct BookmarkRow: View {
 
 struct BookmarkSelection: Identifiable { let bookmark: BookmarkView; var id: String { bookmark.uri } }
 private struct BrowserDestination: Identifiable { let url: URL; var id: URL { url } }
+private struct LibraryFilterKey: Equatable {
+    let archived: Bool
+    let filter: ContentFilter
+    let filterTag: Data?
+    let search: String
+    let sort: LibrarySort
+    let bookmarksRevision: Int
+}
 private struct SafariView: UIViewControllerRepresentable {
     let url: URL
     func makeUIViewController(context: Context) -> SFSafariViewController { SFSafariViewController(url: url) }

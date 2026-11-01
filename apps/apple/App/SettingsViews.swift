@@ -115,14 +115,22 @@ private struct FeedbackView: View {
                         PhotosPicker(selection: $selectedPhotos, maxSelectionCount: 4, matching: .images) { Label("Choose up to four photos", systemImage: "photo.on.rectangle") }
                         if photoLoading { ProgressView("Preparing photos…") }
                         if photoCount > 0 { Text("\(photoCount) photos selected") }
-                        if let photoError { Text(photoError).foregroundStyle(.red) }
+                        if let photoError {
+                            Label(photoError, systemImage: "exclamationmark.triangle")
+                                .foregroundStyle(.red)
+                        }
                         if !selectedPhotos.isEmpty { Button("Remove photos", role: .destructive) { selectedPhotos = []; photos = []; photoCount = 0 } }
                     }
                     Section {
                         Label("Feedback is public", systemImage: "globe")
                         Text("Your title, message, photos, and account identity will be published to the L@tr.link feedback board on AT Protocol. Do not include private information.").font(.footnote).foregroundStyle(.secondary)
                     }
-                    if let error { Section { Text(error).foregroundStyle(.red) } }
+                    if let error {
+                        Section {
+                            Label(error, systemImage: "exclamationmark.triangle")
+                                .foregroundStyle(.red)
+                        }
+                    }
                 }
             }.disabled(sending)
                 .navigationTitle("Feedback")

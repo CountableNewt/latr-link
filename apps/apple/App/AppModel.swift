@@ -6,7 +6,10 @@ import LatrNativeCore
 final class AppModel {
     let runtime: NativeRuntime?
     var session: NativeSession?
-    var bookmarks: [BookmarkView] = []
+    var bookmarks: [BookmarkView] = [] {
+        didSet { bookmarksRevision &+= 1 }
+    }
+    private(set) var bookmarksRevision = 0
     var pending: [PendingSave] = []
     var cursor: String?
     var loadingMore = false

@@ -34,8 +34,7 @@ final class LaunchTests: XCTestCase {
     func testTabletAndPhoneSettingsAndFeedback() {
         let app = fixtureApp()
         XCTAssertTrue(app.staticTexts["Build with SwiftUI"].waitForExistence(timeout: 15))
-        showSidebar(app)
-        let settings = app.buttons["sidebar.Settings"]
+        let settings = app.buttons["Settings"]
         XCTAssertTrue(settings.waitForExistence(timeout: 5))
         settings.tap()
         XCTAssertTrue(app.staticTexts["Theme"].waitForExistence(timeout: 5))
@@ -162,14 +161,6 @@ final class LaunchTests: XCTestCase {
         let dismissed = tip.waitForNonExistence(timeout: 3)
         XCTAssertTrue(dismissed, safari.debugDescription)
         return dismissed
-    }
-
-    @MainActor private func showSidebar(_ app: XCUIApplication) {
-        if app.buttons["sidebar.Settings"].exists && app.buttons["sidebar.Settings"].isHittable { return }
-        let back = app.navigationBars.buttons["L@tr.link"]
-        if back.exists { back.tap(); return }
-        let sidebar = app.buttons["Show Sidebar"]
-        if sidebar.exists { sidebar.tap() }
     }
 
     @MainActor private func capture(_ app: XCUIApplication, name: String) {

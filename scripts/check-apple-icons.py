@@ -12,17 +12,27 @@ repo = Path(__file__).resolve().parent.parent
 icon_source = json.loads(
     (repo / "apps/apple/Resources/AppIcon.icon/icon.json").read_text(encoding="utf-8")
 )
-mark = icon_source["groups"][0]["layers"][0]
+layers = {
+    layer["name"]: layer
+    for group in icon_source["groups"]
+    for layer in group["layers"]
+}
+mark = layers["mark"]
+squircle = layers["inset squircle"]
 assert mark["image-name"] == "l-mark-outlined.svg"
-fills = {
+assert squircle["image-name"] == "inset-squircle-outlined.svg"
+mark_fills = {
     specialization.get("appearance", "default"): specialization["value"]
     for specialization in mark["fill-specializations"]
 }
+squircle_fills = {
+    specialization.get("appearance", "default"): specialization["value"]
+    for specialization in squircle["fill-specializations"]
+}
 white = {"solid": "extended-gray:1.00000,1.00000"}
-for appearance in ("default", "dark", "tinted"):
-    assert fills.get(appearance) == white, (
-        f"{appearance} L mark must use a solid white vector fill"
-    )
+blue = {"solid": "srgb:0.10196,0.43137,1.00000,1.00000"}
+assert mark_fills == {"default": white, "dark": blue, "tinted": white}
+assert squircle_fills == mark_fills, "Inset squircle and L mark fills must match"
 
 mark_source = repo / "apps/apple/Resources/AppIcon.icon/Assets/l-mark-outlined.svg"
 mark_path = ElementTree.parse(mark_source).getroot().find(
@@ -32,6 +42,16 @@ assert mark_path is not None, "Outlined L vector must contain an SVG path"
 assert mark_path.get("stroke") is None, "Icon Composer requires the L stroke converted to an outline"
 assert mark_path.get("fill") == "#FFFFFF", "Outlined L vector must have a white source fill"
 assert (mark_path.get("d") or "").rstrip().endswith("Z"), "Outlined L vector path must be closed"
+
+squircle_source = repo / "apps/apple/Resources/AppIcon.icon/Assets/inset-squircle-outlined.svg"
+squircle_path = ElementTree.parse(squircle_source).getroot().find(
+    "{http://www.w3.org/2000/svg}path"
+)
+assert squircle_path is not None, "Inset squircle vector must contain an SVG path"
+assert squircle_path.get("stroke") is None, "Inset squircle must be an outlined fill"
+assert squircle_path.get("fill") == "#FFFFFF", "Inset squircle must have a white source fill"
+assert squircle_path.get("fill-rule") == "evenodd", "Inset squircle must preserve its open center"
+assert (squircle_path.get("d") or "").count("Z") == 2, "Inset squircle must contain closed outer and inner paths"
 
 with (app / "Info.plist").open("rb") as source:
     info = plistlib.load(source)
@@ -49,4 +69,4 @@ for idiom in ("phone", "pad"):
         if asset.get("AssetType") == "Icon Image" and asset.get("Idiom") == idiom
     }
     assert appearances <= fallbacks, f"Missing {idiom} iOS 18 fallbacks: {appearances - fallbacks}"
-print("Apple icon: readable vector fills, dynamic layers, and iPhone/iPad fallbacks verified.")
+print("Apple icon: matching inset squircle and L fills, dynamic layers, and iPhone/iPad fallbacks verified.")

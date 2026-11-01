@@ -16,7 +16,11 @@ struct TagsEditor: View {
                 TextField("Add a tag", text: $input).textInputAutocapitalization(.never).autocorrectionDisabled().onSubmit(addTag)
                 Button("Add", action: addTag).disabled(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
-            if let error { Text(error).font(.caption).foregroundStyle(.red) }
+            if let error {
+                Label(error, systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
             ForEach(Array(suggestions.filter { candidate in !tags.contains(where: { ExactTag.equal($0, candidate) }) && !input.isEmpty && candidate.localizedCaseInsensitiveContains(input) }.prefix(8)).map(ExactTag.init)) { item in
                 let suggestion = item.value
                 Button(suggestion) { input = suggestion; addTag() }
@@ -116,9 +120,13 @@ struct PendingSavesView: View {
             ForEach(model.pending) { save in
                 VStack(alignment: .leading, spacing: 8) {
                     Text(save.subject).font(.headline).textSelection(.enabled)
-                    Text(save.tags.joined(separator: ", ")).font(.caption)
+                    Text(save.tags.formatted()).font(.caption)
                     Label(save.isDraft ? "Draft — choose account" : save.lastError == nil ? "Pending" : "Failed — retained for retry", systemImage: save.isDraft ? "pencil" : "clock").foregroundStyle(.secondary)
-                    if let error = save.lastError { Text(error).font(.caption).foregroundStyle(.red) }
+                    if let error = save.lastError {
+                        Label(error, systemImage: "exclamationmark.triangle")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
                     HStack {
                         Button("Edit") { editing = save }
                         if save.isDraft { Button("Save to my account") { adopting = save; adoptionDID = model.session?.did; adoptionLabel = model.session?.handle ?? model.session?.did ?? "your account" } }
@@ -184,7 +192,7 @@ struct TagsView: View {
     var body: some View {
         List {
             if let progress = model.tagProgress { Text(progress).font(.footnote).foregroundStyle(.secondary) }
-            ForEach(tagNames.sorted().map(ExactTag.init)) { item in
+            ForEach(tagNames.map(ExactTag.init)) { item in
                 let tag = item.value
                 HStack {
                     Button { select(tag) } label: { HStack { Label(tag, systemImage: "tag"); Spacer(); Text("\(counts[Data(tag.utf8)] ?? 0)").foregroundStyle(.secondary) } }
@@ -213,7 +221,7 @@ struct TagsView: View {
             let all = try await runtime.library.listBookmarks()
             let tags = all.flatMap(\.tags)
             counts = tags.reduce(into: [:]) { $0[Data($1.utf8), default: 0] += 1 }
-            tagNames = ExactTag.unique(tags)
+            tagNames = ExactTag.unique(tags).sorted()
         }
         catch { model.error = error.localizedDescription }
     }
