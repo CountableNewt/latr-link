@@ -17,7 +17,15 @@ final class LaunchTests: XCTestCase {
     func testLibraryCanSaveThroughNativeQueueAndFilter() {
         let app = fixtureApp()
         XCTAssertTrue(app.staticTexts["Build with SwiftUI"].waitForExistence(timeout: 15))
-        app.buttons["Save link"].tap()
+        let saveLink = app.buttons["Save link"]
+        if !saveLink.exists || !saveLink.isHittable {
+            // iPad can place navigation actions in the system toolbar overflow.
+            let overflow = app.buttons["TopOverflowBarButtonItem"]
+            XCTAssertTrue(overflow.waitForExistence(timeout: 5), app.debugDescription)
+            overflow.tap()
+        }
+        XCTAssertTrue(saveLink.waitForExistence(timeout: 5), app.debugDescription)
+        saveLink.tap()
         let field = app.textFields["Web link or AT URI"]
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.tap()
