@@ -42,7 +42,8 @@ final class LaunchTests: XCTestCase {
     func testTabletAndPhoneSettingsAndFeedback() {
         let app = fixtureApp()
         XCTAssertTrue(app.staticTexts["Build with SwiftUI"].waitForExistence(timeout: 15))
-        let settings = app.buttons["Settings"]
+        // iPad floating tabs expose both a wrapper and a nested button.
+        let settings = app.buttons["Settings"].firstMatch
         XCTAssertTrue(settings.waitForExistence(timeout: 5))
         settings.tap()
         XCTAssertTrue(app.staticTexts["Theme"].waitForExistence(timeout: 5))
