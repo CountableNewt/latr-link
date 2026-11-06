@@ -48,9 +48,27 @@ jobs:
           path: apps/extension/.output/store/
           retention-days: 14
 
+  ci-apple:
+    name: iPhone and iPad test and build
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Run native Apple checks
+        run: bash scripts/ci-apple.sh
+      - name: Upload Apple test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-apple-test-results
+          path: apps/apple/DerivedData/Logs/Test/
+          if-no-files-found: ignore
+          retention-days: 7
+
   required:
     name: CI — Required
-    needs: [ci-gateway, ci-js]
+    needs: [ci-gateway, ci-js, ci-apple]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -58,6 +76,8 @@ jobs:
         env:
           GATEWAY_RESULT: ${{ needs.ci-gateway.result }}
           JS_RESULT: ${{ needs.ci-js.result }}
+          APPLE_RESULT: ${{ needs.ci-apple.result }}
         run: |
           test "$GATEWAY_RESULT" = success
           test "$JS_RESULT" = success
+          test "$APPLE_RESULT" = success

@@ -13,6 +13,7 @@ Next.js (latr.link)  ── ATProto OAuth ──►  Your PDS
 ```
 latr-link/
   apps/
+    apple/         # SwiftUI iPhone/iPad app and Share Extension
     web/           # Next.js web client (Bun)
     latrkit-dev/   # LatrKit developer console (Bun)
   packages/
@@ -67,6 +68,22 @@ If the console shows `WebSocket connection to .../_next/webpack-hmr` failures, h
 | `bun run lint` | ESLint |
 | `bun run typecheck` | TypeScript |
 | `bun run test` | Unit tests (workspace) |
+
+## iPhone and iPad app
+
+The native app and Share Extension live in [apps/apple](apps/apple/README.md).
+With Xcode 26+ and XcodeGen installed, generate and open the project:
+
+```sh
+cd apps/apple
+xcodegen generate
+open LatrLink.xcodeproj
+```
+
+Use the `LatrLink` scheme. Debug targets Development; Release targets Production.
+Run `bash scripts/ci-apple.sh` from the repository root for core tests, a Release
+simulator build, icon validation, and iPhone/iPad UI tests. The Xcode project is
+generated and ignored; edit `apps/apple/project.yml` for persistent project changes.
 
 ## Architecture
 
