@@ -5,6 +5,7 @@ public enum GatewayStorageConfigurationError: Error, Sendable {
     case postgresURLRequired
     case explicitSQLitePathRequired
     case legacyJSONMigrationRequired
+    case postgresMigrationRequired
 }
 
 extension GatewayConfig {
@@ -26,6 +27,9 @@ extension GatewayConfig {
         if let explicitPath, !explicitPath.isEmpty {
             guard explicitPath != ":memory:", explicitPath.hasPrefix("/") || appEnv == .local else {
                 throw GatewayStorageConfigurationError.explicitSQLitePathRequired
+            }
+            if databaseURL != nil, !FileManager.default.fileExists(atPath: explicitPath) {
+                throw GatewayStorageConfigurationError.postgresMigrationRequired
             }
             return explicitPath
         }

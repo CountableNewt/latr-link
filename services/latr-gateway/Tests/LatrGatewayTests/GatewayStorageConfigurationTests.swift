@@ -35,6 +35,9 @@ struct GatewayStorageConfigurationTests {
         #expect(throws: GatewayStorageConfigurationError.self) {
             try config(databaseURL: "postgresql://example/test").resolvedSQLitePath()
         }
+        #expect(throws: GatewayStorageConfigurationError.self) {
+            try config(env: .prod, databaseURL: "postgresql://example/test", path: "/nonexistent/latr-migration.sqlite").resolvedSQLitePath()
+        }
     }
 
     @Test func rollbackRequiresExplicitBackendAndURL() throws {

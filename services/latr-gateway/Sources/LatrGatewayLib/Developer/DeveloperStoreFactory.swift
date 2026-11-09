@@ -9,7 +9,10 @@ public enum DeveloperStoreFactory {
         if config.appEnv == .test {
             return (InMemoryDeveloperStore(officialEnvCredentials: config.officialClientCredentials), InMemoryBookmarkPreviewStore())
         }
-        let database = try SQLiteDatabase(path: config.resolvedSQLitePath())
+        let database = try SQLiteDatabase(
+            path: config.resolvedSQLitePath(),
+            requireExistingSchema: config.databaseURL != nil
+        )
         return (
             SQLiteDeveloperStore(database: database, officialEnvCredentials: config.officialClientCredentials, logger: logger),
             SQLiteBookmarkPreviewStore(database: database)
