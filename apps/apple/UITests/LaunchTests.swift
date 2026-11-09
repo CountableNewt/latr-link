@@ -20,7 +20,10 @@ final class LaunchTests: XCTestCase {
         let saveLink = app.buttons["Save link"]
         if !saveLink.exists || !saveLink.isHittable {
             // iPad can place navigation actions in the system toolbar overflow.
-            let overflow = app.buttons["TopOverflowBarButtonItem"]
+            let overflow = app.navigationBars.buttons.matching(NSPredicate(
+                format: "identifier == %@ OR identifier == %@ OR label == %@",
+                "TopOverflowBarButtonItem", "OverflowBarButtonItem", "More"
+            )).firstMatch
             XCTAssertTrue(overflow.waitForExistence(timeout: 5), app.debugDescription)
             overflow.tap()
         }
