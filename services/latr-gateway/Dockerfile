@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # Build context: monorepo root (LatrKit resolves from GitHub via SwiftPM).
 
-FROM swift:6.1-jammy AS builder
+FROM swift:6.4-jammy AS builder
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libsqlite3-dev \
@@ -11,7 +11,7 @@ WORKDIR /src
 COPY services/latr-gateway/ ./services/latr-gateway/
 
 WORKDIR /src/services/latr-gateway
-RUN swift build -c release --static-swift-stdlib
+RUN swift build -c release --static-swift-stdlib -Xswiftc -warnings-as-errors
 
 FROM ubuntu:22.04
 

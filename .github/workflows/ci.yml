@@ -21,9 +21,12 @@ permissions:
 jobs:
   ci-gateway:
     name: Gateway test and build
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
+    container: swift:6.4-jammy
     steps:
       - uses: actions/checkout@v6
+      - name: Install gateway test dependencies
+        run: apt-get update && apt-get install -y --no-install-recommends libsqlite3-dev python3
       - name: Run gateway CI
         run: bash scripts/ci-gateway.sh
 
