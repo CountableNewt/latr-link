@@ -162,8 +162,24 @@ cd apps/web && bun run dev
 ```
 
 SQLite schema migration runs at startup. Hosted environments require an explicit
-persistent database path. Existing JSON files are not silently imported; preserve
-and migrate any legacy local developer data before adopting the new path.
+persistent database path. Existing JSON files are not silently imported. Stop the
+local Gateway and convert its legacy store while retaining the original JSON:
+
+```bash
+python3 scripts/migrate-gateway-to-sqlite.py \
+  --legacy-developer-json services/latr-gateway/data/developer-store.json \
+  --output services/latr-gateway/data/latr-gateway.sqlite
+```
+
+Use the actual path from `LATR_GATEWAY_DEVELOPER_STORE_PATH` if customized.
+The converter preserves client IDs, API-key hashes and revocations, and usage;
+unlimited Swift `Int.max` limits become the database's equivalent `Int32.max`.
+Legacy preview caches were in memory and have no data to copy. Start Gateway
+with `LATR_GATEWAY_SQLITE_PATH` set explicitly to the converted file. Keep the
+JSON backup until authentication, limits, and restart persistence pass. The
+converter rejects malformed entries and foreign-key orphans. Older JSON stores
+can retain usage for deleted clients; reconcile those historical entries in a
+separate copy of the JSON before retrying, retaining the original for audit.
 
 ## Railway deployment
 

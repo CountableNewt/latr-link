@@ -53,6 +53,62 @@ class GatewaySQLiteMigrationTests(unittest.TestCase):
             migration.import_snapshot(self.snapshot, self.output)
         self.assertFalse(self.output.exists())
 
+    def legacy(self):
+        return {
+            "clients": {"legacy": {"clientID": "legacy", "ownerDID": "did:plc:owner", "displayName": "Legacy 📚", "isOfficial": True, "billingStatus": "internal", "dailyRequestLimit": 9223372036854775807, "createdAt": "2026-11-09T01:02:03Z"}},
+            "apiKeys": {"key": {"keyID": "key", "clientID": "legacy", "keyHash": "original-hash", "createdAt": "2026-11-09T01:02:03Z", "revokedAt": "2026-11-09T02:02:03Z"}},
+            "usage": {"legacy|2026-11-09|saves": 17},
+        }
+
+    def test_legacy_snapshot_preserves_keys_revocations_and_usage(self):
+        source = self.legacy()
+        counts = migration.import_snapshot(migration.legacy_snapshot(source), self.output)
+        self.assertEqual(counts["bookmark_previews"], 0)
+        with sqlite3.connect(self.output) as db:
+            self.assertEqual(db.execute("SELECT key_hash, revoked_at, label FROM developer_api_keys").fetchone(), ("original-hash", "2026-11-09T02:02:03.000000Z", None))
+            self.assertEqual(db.execute("SELECT daily_request_limit, display_name FROM developer_clients").fetchone(), (2147483647, "Legacy 📚"))
+            self.assertEqual(db.execute("SELECT client_id, usage_date, route_family, request_count FROM developer_usage_daily").fetchone(), ("legacy", "2026-11-09", "saves", 17))
+        self.assertEqual(source, self.legacy())
+
+    def test_legacy_environment_records_preserve_empty_dates(self):
+        source = self.legacy()
+        source["clients"]["legacy"]["ownerDID"] = "official:env"
+        source["clients"]["legacy"]["createdAt"] = ""
+        source["apiKeys"] = {"env:legacy": {"keyID": "env:legacy", "clientID": "legacy", "keyHash": "env-hash", "label": "env", "createdAt": ""}}
+        migration.import_snapshot(migration.legacy_snapshot(source), self.output)
+        with sqlite3.connect(self.output) as db:
+            self.assertEqual(db.execute("SELECT created_at FROM developer_api_keys").fetchone()[0], "")
+
+    def test_legacy_malformed_shapes_refuse_import(self):
+        cases = []
+        source = self.legacy()
+        source["clients"]["legacy"]["clientID"] = "mismatch"
+        cases.append(source)
+        source = self.legacy()
+        source["apiKeys"]["key"]["keyHash"] = 123
+        cases.append(source)
+        source = self.legacy()
+        source["usage"] = {"legacy|2026-11-09|saves": True}
+        cases.append(source)
+        source = self.legacy()
+        source["usage"] = {"legacy|2026-99-09|saves": 12}
+        cases.append(source)
+        source = self.legacy()
+        source["usage"] = {"legacy|2026-11-09": 12}
+        cases.append(source)
+        for source in cases:
+            with self.subTest(source=source):
+                with self.assertRaises(ValueError):
+                    migration.legacy_snapshot(source)
+        self.assertFalse(self.output.exists())
+
+    def test_legacy_orphans_are_not_silently_discarded(self):
+        source = self.legacy()
+        source["usage"]["deleted-client|2026-11-09|saves"] = 3
+        with self.assertRaises(sqlite3.IntegrityError):
+            migration.import_snapshot(migration.legacy_snapshot(source), self.output)
+        self.assertFalse(self.output.exists())
+
     def test_empty_database_can_be_imported(self):
         counts = migration.import_snapshot({name: [] for name in migration.TABLES}, self.output)
         self.assertEqual(counts, {name: 0 for name in migration.TABLES})

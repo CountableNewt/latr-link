@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only PostgreSQL snapshot -> verified SQLite file. Never overwrites a file."""
+"""PostgreSQL or legacy local JSON -> verified SQLite file. Never overwrites a file."""
 import argparse
 import datetime
 import json
@@ -49,6 +49,50 @@ def write_snapshot(path, snapshot):
         os.fsync(stream.fileno())
 
 
+def legacy_snapshot(source):
+    """Decode Swift's Codable DeveloperStoreSnapshot without dropping any records."""
+    if not isinstance(source, dict) or set(source) != {"clients", "apiKeys", "usage"}:
+        raise ValueError("Invalid legacy developer snapshot")
+    if any(not isinstance(source[name], dict) for name in source):
+        raise ValueError("Legacy snapshot collections must be dictionaries")
+    snapshot = {table: [] for table in TABLES}
+    client_fields = {"clientID", "ownerDID", "displayName", "isOfficial", "billingStatus", "stripeCustomerID", "dailyRequestLimit", "createdAt"}
+    key_fields = {"keyID", "clientID", "keyHash", "label", "createdAt", "revokedAt"}
+
+    def record(value, fields, optional):
+        if not isinstance(value, dict) or not fields - optional <= set(value) or not set(value) <= fields:
+            raise ValueError("Invalid legacy record fields")
+        for field in fields - {"isOfficial", "dailyRequestLimit"}:
+            item = value.get(field)
+            if not isinstance(item, str) and not (field in optional and item is None):
+                raise ValueError("Invalid legacy text field")
+
+    for identifier, value in source["clients"].items():
+        record(value, client_fields, {"displayName", "stripeCustomerID"})
+        limit = value["dailyRequestLimit"]
+        if identifier != value["clientID"] or type(value["isOfficial"]) is not bool or type(limit) is not int or not 0 <= limit <= 9223372036854775807:
+            raise ValueError("Invalid legacy client identity or limit")
+        snapshot["developer_clients"].append(dict(zip(TABLES["developer_clients"], (
+            value["clientID"], value["ownerDID"], value.get("displayName"), value["isOfficial"], value["billingStatus"],
+            value.get("stripeCustomerID"), 2147483647 if limit == 9223372036854775807 else limit, value["createdAt"],
+        ))))
+    for identifier, value in source["apiKeys"].items():
+        record(value, key_fields, {"label", "revokedAt"})
+        if identifier != value["keyID"]:
+            raise ValueError("Invalid legacy API key identity")
+        snapshot["developer_api_keys"].append(dict(zip(TABLES["developer_api_keys"], (
+            value["keyID"], value["clientID"], value["keyHash"], value.get("label"), value["createdAt"], value.get("revokedAt"),
+        ))))
+    for identifier, count in source["usage"].items():
+        parts = identifier.split("|")
+        if len(parts) != 3 or not all(parts) or type(count) is not int or not 0 <= count <= 9223372036854775807:
+            raise ValueError("Invalid legacy usage entry")
+        if datetime.date.fromisoformat(parts[1]).isoformat() != parts[1]:
+            raise ValueError("Invalid legacy usage date")
+        snapshot["developer_usage_daily"].append(dict(zip(TABLES["developer_usage_daily"], (*parts, count))))
+    return snapshot
+
+
 def normalize(snapshot):
     if set(snapshot) != set(TABLES):
         raise ValueError("Snapshot must contain exactly the four gateway tables")
@@ -60,6 +104,12 @@ def normalize(snapshot):
                 raise ValueError(f"Unexpected columns in {table}")
             for column in ("created_at", "revoked_at", "updated_at", "expires_at"):
                 if column in row and row[column] is not None:
+                    # The legacy JSON store persisted env-generated records with empty dates.
+                    if column == "created_at" and row[column] == "" and (
+                        (table == "developer_clients" and row["owner_did"] == "official:env" and row["is_official"])
+                        or (table == "developer_api_keys" and row["key_id"].startswith("env:") and row["label"] == "env")
+                    ):
+                        continue
                     value = datetime.datetime.fromisoformat(row[column].replace("Z", "+00:00"))
                     if value.tzinfo is None:
                         raise ValueError(f"Timezone missing in {table}.{column}")
@@ -116,19 +166,24 @@ def import_snapshot(snapshot, destination, schema=SCHEMA):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", required=True, type=Path)
-    parser.add_argument("--source-json", type=Path, help="Import a previously captured snapshot instead of contacting Postgres")
+    sources = parser.add_mutually_exclusive_group()
+    sources.add_argument("--source-json", type=Path, help="Import a previously captured Postgres snapshot")
+    sources.add_argument("--legacy-developer-json", type=Path, help="Import Swift's legacy local developer-store.json")
     parser.add_argument("--export-json", type=Path, help="Required for Postgres: retain the source snapshot (0600 permissions)")
     args = parser.parse_args()
     try:
-        if not args.source_json and not args.export_json:
+        if not args.source_json and not args.legacy_developer_json and not args.export_json:
             raise ValueError("--export-json is required when exporting Postgres")
         if args.output.exists():
             raise ValueError("Destination already exists")
-        snapshot = json.loads(args.source_json.read_text()) if args.source_json else export_postgres()
+        if args.legacy_developer_json:
+            snapshot = legacy_snapshot(json.loads(args.legacy_developer_json.read_text()))
+        else:
+            snapshot = json.loads(args.source_json.read_text()) if args.source_json else export_postgres()
         if args.export_json:
             write_snapshot(args.export_json, snapshot)
         counts = import_snapshot(snapshot, args.output)
-    except (ValueError, OSError, sqlite3.Error, subprocess.SubprocessError):
+    except (ValueError, TypeError, OSError, sqlite3.Error, subprocess.SubprocessError):
         parser.exit(1, "Migration failed; no unverified SQLite database was published. Check paths, connectivity, source data and schema.\n")
     print(json.dumps({"verified_rows": counts, "output": str(args.output)}))
 
