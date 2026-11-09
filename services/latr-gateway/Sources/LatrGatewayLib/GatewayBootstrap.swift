@@ -11,7 +11,10 @@ public enum GatewayBootstrap {
         var pgPool: PostgresClient?
         let previewStore: any BookmarkPreviewStore
 
-        if let databaseURL = config.databaseURL, config.appEnv != .test {
+        if try config.usesPostgres() {
+            guard let databaseURL = config.databaseURL else {
+                throw GatewayStorageConfigurationError.postgresURLRequired
+            }
             let pgConfig = try makePostgresConfig(from: databaseURL, logger: logger)
             let pool = PostgresClient(configuration: pgConfig, backgroundLogger: logger)
             pgPool = pool
@@ -23,9 +26,10 @@ public enum GatewayBootstrap {
             previewStore = PostgresBookmarkPreviewStore(pool: pool, logger: logger)
             storeLabel = "postgres"
         } else {
-            developerStore = DeveloperStoreFactory.make(config: config, logger: logger)
-            storeLabel = config.appEnv == .test ? "memory" : "json"
-            previewStore = InMemoryBookmarkPreviewStore()
+            let stores = try DeveloperStoreFactory.makeSQLiteStores(config: config, logger: logger)
+            developerStore = stores.developer
+            previewStore = stores.preview
+            storeLabel = config.appEnv == .test ? "memory" : "sqlite"
         }
 
         let services = GatewayServices(

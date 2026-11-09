@@ -18,9 +18,11 @@ let package = Package(
         .package(url: "https://github.com/vapor/postgres-nio.git", from: "1.21.0"),
     ],
     targets: [
+        .systemLibrary(name: "CSQLite", pkgConfig: "sqlite3", providers: [.apt(["libsqlite3-dev"]), .brew(["sqlite3"])]),
         .target(
             name: "LatrGatewayLib",
             dependencies: [
+                "CSQLite",
                 .product(name: "LatrKit", package: "latr-kit"),
                 .product(name: "Hummingbird", package: "hummingbird"),
                 .product(name: "AsyncHTTPClient", package: "async-http-client"),
@@ -28,7 +30,8 @@ let package = Package(
                 .product(name: "P256K", package: "swift-secp256k1"),
                 .product(name: "PostgresNIO", package: "postgres-nio"),
             ],
-            path: "Sources/LatrGatewayLib"
+            path: "Sources/LatrGatewayLib",
+            resources: [.copy("Database/sqlite-schema.sql")]
         ),
         .executableTarget(
             name: "LatrGateway",

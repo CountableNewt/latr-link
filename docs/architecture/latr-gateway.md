@@ -134,8 +134,10 @@ Full template: [`services/latr-gateway/.env.example`](../../services/latr-gatewa
 | `OAUTH_GATEWAY_REQUIRE_KNOWN_CLIENT` | No | `true` when `APP_ENV=prod` | Require registered gateway client id + API key from the developer store |
 | `LATR_GATEWAY_REQUIRE_CLIENT_API_KEY` | No | `true` when `APP_ENV=prod` | Require app credential headers |
 | `LATR_GATEWAY_OFFICIAL_CLIENT_CREDENTIALS` | No | _(empty)_ | Internal legacy `client-id=base64` pairs |
-| `DATABASE_URL` | Yes on Railway | _(empty)_ | Private Railway Postgres URL for developer data and the subject-keyed bookmark preview cache |
-| `LATR_GATEWAY_DEVELOPER_STORE_PATH` | No | `./data/developer-store.json` | JSON fallback when `DATABASE_URL` is unset (local dev) |
+| `LATR_GATEWAY_DATABASE_BACKEND` | No | `sqlite` | Persistence backend; explicit `postgres` supports rollback |
+| `LATR_GATEWAY_SQLITE_PATH` | Yes on Railway | `./data/latr-gateway.sqlite` locally | SQLite database for developer data and bookmark previews; Railway volume at `/data` |
+| `DATABASE_URL` | Postgres backend only | _(empty)_ | Private rollback Postgres URL; never implicitly selects Postgres |
+| `LATR_GATEWAY_DEVELOPER_STORE_PATH` | No | `./data/developer-store.json` | Legacy JSON import source; no longer the default persistence backend |
 | `LATR_GATEWAY_CLIENT_REGISTRY_PATH` | No | `./data/client-registry.json` | Legacy JSON registry (deprecated) |
 
 **L@tr web** — `LATR_GATEWAY_CLIENT_CREDENTIAL` or split `LATR_GATEWAY_CLIENT_ID` + `LATR_GATEWAY_API_KEY` are server-only secrets. Browser calls go to the same-origin Next.js proxy at `/api/latr-gateway/*`; the proxy forwards OAuth/DPoP headers and injects gateway client credentials server-side.
@@ -159,15 +161,31 @@ cd apps/latrkit-dev && bun run dev
 cd apps/web && bun run dev
 ```
 
-Apply the provider-neutral migration history when using `DATABASE_URL`:
+SQLite schema migration runs at startup. Hosted environments require an explicit
+persistent database path. Existing JSON files are not silently imported. Stop the
+local Gateway and convert its legacy store while retaining the original JSON:
 
 ```bash
-bash scripts/apply-database-migrations.sh
+python3 scripts/migrate-gateway-to-sqlite.py \
+  --legacy-developer-json services/latr-gateway/data/developer-store.json \
+  --output services/latr-gateway/data/latr-gateway.sqlite
 ```
+
+Use the actual path from `LATR_GATEWAY_DEVELOPER_STORE_PATH` if customized.
+The converter preserves client IDs, API-key hashes and revocations, and usage;
+unlimited Swift `Int.max` limits become the database's equivalent `Int32.max`.
+Legacy preview caches were in memory and have no data to copy. Start Gateway
+with `LATR_GATEWAY_SQLITE_PATH` set explicitly to the converted file. Keep the
+JSON backup until authentication, limits, and restart persistence pass. The
+converter rejects malformed entries and foreign-key orphans. Older JSON stores
+can retain usage for deleted clients; reconcile those historical entries in a
+separate copy of the JSON before retrying, retaining the original for audit.
 
 ## Railway deployment
 
-Railway builds Gateway from `/railway/gateway.json`. Its pre-deploy command
-applies migrations through the private `DATABASE_URL` reference before starting
-the new release. GitHub Actions runs tests only and never mutates hosted data.
-See [the Railway runbook](../deployment/railway.md).
+Railway builds Gateway from `/railway/gateway.json`. Attach an environment-local
+volume at `/data`, set `LATR_GATEWAY_SQLITE_PATH=/data/latr-gateway.sqlite`, select
+`LATR_GATEWAY_DATABASE_BACKEND=sqlite`, and use one replica. Application startup
+migrates the database after the volume is mounted. GitHub Actions runs tests only
+and never mutates hosted data. See [the Railway runbook](../deployment/railway.md)
+for verified Postgres export/import, backups, and rollback constraints.

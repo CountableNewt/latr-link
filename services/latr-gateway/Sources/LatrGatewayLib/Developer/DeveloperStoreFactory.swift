@@ -1,26 +1,21 @@
 import Foundation
 import Logging
-import PostgresNIO
 
 public enum DeveloperStoreFactory {
-    public static func make(
+    public static func makeSQLiteStores(
         config: GatewayConfig,
-        postgres: PostgresClient? = nil,
         logger: Logger = Logger(label: "latr-gateway")
-    ) -> any DeveloperStore {
+    ) throws -> (developer: any DeveloperStore, preview: any BookmarkPreviewStore) {
         if config.appEnv == .test {
-            return InMemoryDeveloperStore(officialEnvCredentials: config.officialClientCredentials)
+            return (InMemoryDeveloperStore(officialEnvCredentials: config.officialClientCredentials), InMemoryBookmarkPreviewStore())
         }
-        if let postgres, config.databaseURL != nil {
-            return PostgresDeveloperStore(
-                pool: postgres,
-                officialEnvCredentials: config.officialClientCredentials,
-                logger: logger
-            )
-        }
-        return PersistentDeveloperStore(
-            officialEnvCredentials: config.officialClientCredentials,
-            storeURL: config.developerStoreURL
+        let database = try SQLiteDatabase(
+            path: config.resolvedSQLitePath(),
+            requireExistingSchema: config.databaseURL != nil
+        )
+        return (
+            SQLiteDeveloperStore(database: database, officialEnvCredentials: config.officialClientCredentials, logger: logger),
+            SQLiteBookmarkPreviewStore(database: database)
         )
     }
 }

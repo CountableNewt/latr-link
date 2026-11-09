@@ -13,10 +13,13 @@ config-as-code file:
 | LatrKit Developer Console | `/railway/latrkit-dev.json` | Railway-injected `PORT` |
 | Gateway | `/railway/gateway.json` | `8080` |
 
-Development tracks the `dev` branch; Production tracks `main`. The managed
-Postgres service is environment-isolated and does not need repository config.
-The gateway applies `services/latr-gateway/migrations/*.sql` in a Railway
-pre-deploy command and records each version in `schema_migrations`.
+Development tracks the `dev` branch; Production tracks `main`. Gateway uses
+SQLite on an environment-local persistent volume mounted at `/data`, with
+`LATR_GATEWAY_DATABASE_BACKEND=sqlite` and
+`LATR_GATEWAY_SQLITE_PATH=/data/latr-gateway.sqlite`. Run one Gateway replica.
+Schema migrations happen during application startup after volume mount, rather
+than in a Railway pre-deploy container. Follow the [cutover runbook](../docs/deployment/railway.md)
+to preserve existing developer data and verify backups before switching live services.
 
 The Web service reaches Gateway privately with
 `LATR_GATEWAY_INTERNAL_URL=http://${{Gateway.RAILWAY_PRIVATE_DOMAIN}}:8080`.

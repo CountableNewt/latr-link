@@ -5,6 +5,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p test_gateway_sqlite_migration.py
+
 SWIFT_WARNING_FLAGS=(-Xswiftc -warnings-as-errors)
 
 # The suite mixes swift-testing (@Test) and XCTest (RouterTests, LatrXRPCMethodTests).
