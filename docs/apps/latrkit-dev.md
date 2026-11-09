@@ -21,7 +21,7 @@ cd apps/latrkit-dev && bun run dev   # http://127.0.0.1:3001
 | Variable | Description |
 |----------|-------------|
 | `LATR_GATEWAY_DEVELOPER_STORE_PATH` | JSON persistence for clients/keys/usage |
-| `DATABASE_URL` | Railway Postgres; Gateway applies the migration history before deployment |
+| `LATR_GATEWAY_SQLITE_PATH` | Gateway SQLite file on its persistent volume; schema initialized at startup |
 
 See [`docs/architecture/latr-gateway.md`](../architecture/latr-gateway.md), the
 [Railway runbook](../deployment/railway.md), and

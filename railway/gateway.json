@@ -6,13 +6,15 @@
     "watchPatterns": [
       "/services/latr-gateway/**",
       "/scripts/apply-database-migrations.sh",
-      "/railway/gateway.json"
+      "/railway/gateway.json",
+      "/scripts/start-latr-gateway.sh",
+      "/scripts/migrate-gateway-to-sqlite.py"
     ]
   },
   "deploy": {
-    "preDeployCommand": "/usr/local/bin/apply-database-migrations",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 600,
-    "restartPolicyType": "ALWAYS"
+    "restartPolicyType": "ALWAYS",
+    "numReplicas": 1
   }
 }
