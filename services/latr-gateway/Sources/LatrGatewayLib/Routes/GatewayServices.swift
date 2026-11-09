@@ -20,11 +20,13 @@ public struct GatewayServices: Sendable {
         config: GatewayConfig,
         httpClient: HTTPClient,
         logger: Logger = Logger(label: "latr-gateway")
-    ) -> GatewayServices {
-        GatewayServices(
+    ) throws -> GatewayServices {
+        let stores = try DeveloperStoreFactory.makeSQLiteStores(config: config, logger: logger)
+        return GatewayServices(
             config: config,
             httpClient: httpClient,
-            developerStore: DeveloperStoreFactory.make(config: config, logger: logger)
+            developerStore: stores.developer,
+            previewStore: stores.preview
         )
     }
 

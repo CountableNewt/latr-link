@@ -15,6 +15,9 @@ public struct GatewayConfig: Sendable {
     public let oauthLatrkitPublicOrigin: String?
     /// Postgres connection string (apply migrations before starting the service).
     public let databaseURL: String?
+    /// Explicit backend selection. PostgreSQL is retained only for rollback.
+    public let databaseBackend: String?
+    public let sqlitePath: String?
     /// JSON persistence path for developer clients, keys, and usage counters.
     public let developerStoreURL: URL
     /// AppView bases tried in order for Bluesky feed enrichment (`app.bsky.feed.getPosts`).
@@ -34,6 +37,8 @@ public struct GatewayConfig: Sendable {
         oauthPublicOrigin: String? = nil,
         oauthLatrkitPublicOrigin: String? = nil,
         databaseURL: String? = nil,
+        databaseBackend: String? = nil,
+        sqlitePath: String? = nil,
         developerStoreURL: URL = GatewayConfig.defaultDeveloperStoreURL(),
         appViewBaseURLs: [String] = [FederatedSubjectClient.defaultAppViewBaseURL],
         identityBaseURL: String = FederatedSubjectClient.defaultIdentityBaseURL
@@ -49,6 +54,8 @@ public struct GatewayConfig: Sendable {
         self.oauthPublicOrigin = oauthPublicOrigin
         self.oauthLatrkitPublicOrigin = oauthLatrkitPublicOrigin
         self.databaseURL = databaseURL
+        self.databaseBackend = databaseBackend
+        self.sqlitePath = sqlitePath
         self.developerStoreURL = developerStoreURL
         self.appViewBaseURLs = appViewBaseURLs
         self.identityBaseURL = identityBaseURL
@@ -137,6 +144,8 @@ public struct GatewayConfig: Sendable {
             oauthPublicOrigin: oauthPublicOrigin?.isEmpty == false ? oauthPublicOrigin : nil,
             oauthLatrkitPublicOrigin: oauthLatrkitPublicOrigin?.isEmpty == false ? oauthLatrkitPublicOrigin : nil,
             databaseURL: databaseURL?.isEmpty == false ? databaseURL : nil,
+            databaseBackend: env["LATR_GATEWAY_DATABASE_BACKEND"],
+            sqlitePath: env["LATR_GATEWAY_SQLITE_PATH"],
             developerStoreURL: developerStoreURL,
             appViewBaseURLs: appViewBaseURLs,
             identityBaseURL: resolvedIdentityBaseURL
