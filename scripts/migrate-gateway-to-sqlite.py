@@ -17,6 +17,7 @@ TABLES = {
 }
 SCHEMA_CANDIDATES = (
     Path(__file__).resolve().parents[1] / "services/latr-gateway/Sources/LatrGatewayLib/Database/sqlite-schema.sql",
+    Path(__file__).resolve().parent / "LatrGateway_LatrGatewayLib.bundle/sqlite-schema.sql",
     Path(__file__).resolve().parent / "LatrGateway_LatrGatewayLib.resources/sqlite-schema.sql",
 )
 SCHEMA = next((path for path in SCHEMA_CANDIDATES if path.is_file()), SCHEMA_CANDIDATES[0])

@@ -20,7 +20,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /src/services/latr-gateway/.build/release/LatrGateway /usr/local/bin/latr-gateway
-COPY --from=builder /src/services/latr-gateway/.build/release/LatrGateway_LatrGatewayLib.resources /usr/local/bin/LatrGateway_LatrGatewayLib.resources
+COPY --from=builder /src/services/latr-gateway/.build/release/LatrGateway_LatrGatewayLib.bundle /usr/local/bin/LatrGateway_LatrGatewayLib.bundle
 COPY services/latr-gateway/migrations /app/database/migrations
 COPY scripts/apply-database-migrations.sh /usr/local/bin/apply-database-migrations
 COPY scripts/start-latr-gateway.sh /usr/local/bin/start-latr-gateway
