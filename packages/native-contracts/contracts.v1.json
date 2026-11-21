@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "source": "github:Stygian-Tech/latr-packages#e959a47750a50de0f50a8b40820a027328ebf37d",
+  "source": "github:CountableNewt/latr-packages#e959a47750a50de0f50a8b40820a027328ebf37d",
   "scope": "atproto repo:community.lexicon.bookmarks.bookmark?action=create&action=update&action=delete include:link.latr.authFull repo:link.latr.saved.external?action=delete repo:link.latr.saved.item?action=delete repo:com.latr.saved.external?action=delete repo:com.latr.saved.item?action=delete include:app.userinput.authFull blob:*/*",
   "environments": [
     {
