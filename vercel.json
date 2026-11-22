@@ -16,13 +16,13 @@
       "root": "services/go-backend",
       "framework": "go",
       "entrypoint": "cmd/gateway/main.go",
-      "buildCommand": "go build -o \"$VERCEL_OUTPUT_FILE\" ./cmd/gateway"
+      "buildCommand": "go build -buildvcs=false -trimpath -o \"$VERCEL_OUTPUT_FILE\" ./cmd/gateway"
     },
     "metadata": {
       "root": "services/go-backend",
       "framework": "go",
       "entrypoint": "cmd/metadata/main.go",
-      "buildCommand": "go build -o \"$VERCEL_OUTPUT_FILE\" ./cmd/metadata"
+      "buildCommand": "go build -buildvcs=false -trimpath -o \"$VERCEL_OUTPUT_FILE\" ./cmd/metadata"
     }
   },
   "rewrites": [

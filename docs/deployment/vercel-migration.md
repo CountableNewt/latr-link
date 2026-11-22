@@ -13,12 +13,12 @@ Status: implementation in progress; Railway remains authoritative until cutover 
 
 ## Work and acceptance
 
-- [ ] Port and test auth, PDS operations, bookmark/tag APIs, legacy adapters and metadata behavior.
-- [ ] Remove public registration and retire developer console from deployment/build.
-- [ ] Make browser API calls deployment-local and verify OAuth metadata is publicly fetchable in previews.
-- [ ] Configure Services routing, server-only credentials, production and branch preview isolation.
-- [ ] Run Go race/vet/build, JavaScript tests/lint/typecheck/build and Chrome acceptance.
-- [ ] Rehearse SQLite preview-cache transfer to Turso; exclude retired developer credentials and keys.
+- [x] Port and test auth, PDS operations, bookmark/tag APIs and metadata behavior. Legacy `/v1/latr/*`, `link.latr.saved.*` and developer APIs are retired (410).
+- [x] Remove public registration and retire developer console from deployment/build.
+- [x] Make browser API calls deployment-local and verify OAuth metadata is publicly fetchable through a branch-domain protection exception. Other preview domains remain protected.
+- [x] Configure Services routing, server-only credentials, production and branch preview isolation.
+- [x] Run Go race/vet/build, JavaScript tests/lint/typecheck/build and Chrome public-page validation. Signed-in workflow acceptance continues below.
+- [x] Rehearse SQLite cache transfer (11 tests); copy and verify nine unexpired cache rows to separate Turso databases. No developer registry or third-party keys transferred. Five active hashes for the three existing first-party clients are retained only in internal secret configuration.
 - [ ] Deploy preview and verify signed-in save/list/archive/delete/tags and external clients.
 - [ ] Back up Railway SQLite, migrate production cache, switch domains and verify production.
 - [ ] Stop Railway compute only after successful cutover; retain backups and volumes for rollback.
@@ -32,3 +32,20 @@ Turso Free currently includes 100 databases, 5 GB storage, 500 million monthly r
 MyContextProtocol returned HTTP 401 during discovery. Linear tools are not exposed in this session, so this file records progress pending issue access.
 
 Sources: https://vercel.com/docs/services, https://vercel.com/docs/services/bindings, https://vercel.com/docs/functions/runtimes/go, https://vercel.com/docs/plans/hobby, https://turso.tech/pricing.
+
+## Provisioned resources
+
+- Vercel project: `latr-link` under `sam-clemente-s-team`; GitHub source `CountableNewt/latr-link`, production branch `main`. No separate Development project.
+- Services: `web` (Next.js 16.4.5/Turbopack), `gateway` (Go), `metadata` (Go), all in `iad1`.
+- Turso integration resources: `latr-link-preview` (Preview/Development only), `latr-link-production` (Production only), both $0 Starter. No paid plan or overages enabled.
+- Branch alias: https://latr-link-git-feature-sqlite-gateway-sam-clemente-s-team.vercel.app . This alias alone has a deployment-protection exception so OAuth servers can fetch metadata. Application authentication still applies.
+- Production SQLite backup: `/private/tmp/latr-cutover-20261122/production.sqlite`, directory mode 0700/file mode 0600; source quick-check passed. Retain a durable backup before shutdown.
+
+## Verification and fixes
+
+- The proxy signs the original method/URL with `LATR_GATEWAY_PROXY_SECRET`; Go verifies the HMAC before using the public URL for DPoP binding. Vercel's internal hop rewrites ordinary forwarding headers, so accepting those headers alone broke hosted requests.
+- Public pages and library shells prerender statically; authenticated API and OAuth metadata handlers remain dynamic/no-store. Browser bootstrap tests exclude server secrets and internal URLs.
+- The small brand PNG is served directly in its three Next Image uses because the Services image-optimizer path returned 404. Other image settings remain unchanged.
+- Schema-invalid community bookmark rows are skipped while retaining pagination cursors, matching the previous decoder. Malformed source records are never modified.
+- Next.js was patched from 16.4.2 to 16.4.5 after verifying the November security advisory.
+- A companion Social Wire cleanup is prepared at `/private/tmp/social-wire-latr-bookmarks`, branch `codex/latr-bookmark-client`, commit `c5a3b9f1` (96 focused tests/typecheck/lint). Active web/native bookmark flows were already canonical; this removes remaining old helper/backfill paths.
