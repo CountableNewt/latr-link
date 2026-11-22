@@ -3,11 +3,7 @@ import {
   bookmarkUpstreamProofPlanForGatewayRequest,
   createBookmarkMigrationRequestBody,
   createUpstreamDpopProof,
-  LATR_GATEWAY_MIGRATE_LEXICONS_PATH,
-  LATR_GATEWAY_SAVES_PATH,
   LATR_UPSTREAM_DPOP_HEADER,
-  pdsXrpcMethodForGatewayRequest,
-  type UpstreamDpopProofOptions,
 } from "latr-packages/gateway-client";
 
 import { createChainedUpstreamDpopProofPool } from "./upstreamDpopPool";
@@ -42,15 +38,8 @@ type SessionWithTokenSet = OAuthSession & {
 };
 
 const PDS_SESSION_ATTESTATION_PATHS = new Set([
-  "/v1/latr/discover/at-uri",
-  "/v1/latr/og-preview",
   latrXrpcPath(LATR_XRPC.resolveUrl),
   latrXrpcPath(LATR_XRPC.getOpenGraph),
-]);
-
-const XRPC_SAVE_PATHS = new Set([
-  latrXrpcPath(LATR_XRPC.saveUrl),
-  latrXrpcPath(LATR_XRPC.saveSubject),
 ]);
 
 function stripQueryAndFragment(url: string): string {
@@ -129,63 +118,6 @@ function headersForGatewayHop(
   };
 }
 
-/** Upstream proofs for GET /v1/latr/saves (paginated listRecords only). */
-export async function createListSavesUpstreamDpopProofPool(
-  oauthSession: OAuthSession,
-  options: UpstreamDpopProofOptions = {}
-): Promise<string> {
-  return createChainedUpstreamDpopProofPool(
-    oauthSession,
-    [{ xrpcMethod: "com.atproto.repo.listRecords", httpMethod: "GET", count: 8 }],
-    options
-  );
-}
-
-/** Upstream proofs for POST /v1/latr/migrate-lexicons (legacy copy + delete). */
-export async function createMigrateLexiconsUpstreamDpopProofPool(
-  oauthSession: OAuthSession,
-  options: UpstreamDpopProofOptions = {}
-): Promise<string> {
-  return createChainedUpstreamDpopProofPool(
-    oauthSession,
-    [
-      { xrpcMethod: "com.atproto.repo.listRecords", httpMethod: "GET", count: 8 },
-      { xrpcMethod: "com.atproto.repo.createRecord", httpMethod: "POST", count: 12 },
-      { xrpcMethod: "com.atproto.repo.deleteRecord", httpMethod: "POST", count: 12 },
-    ],
-    options
-  );
-}
-
-/** Upstream proofs for POST /v1/latr/saves (external wrapper + saved item writes). */
-export async function createSaveUpstreamDpopProofPool(
-  oauthSession: OAuthSession,
-  options: UpstreamDpopProofOptions = {}
-): Promise<string> {
-  return createChainedUpstreamDpopProofPool(
-    oauthSession,
-    [
-      { xrpcMethod: "com.atproto.repo.createRecord", httpMethod: "POST", count: 4 },
-      { xrpcMethod: "com.atproto.repo.putRecord", httpMethod: "POST", count: 4 },
-    ],
-    options
-  );
-}
-
-export async function createSetStateUpstreamDpopProofPool(
-  oauthSession: OAuthSession,
-  options: UpstreamDpopProofOptions = {}
-): Promise<string> {
-  return createChainedUpstreamDpopProofPool(
-    oauthSession,
-    [
-      { xrpcMethod: "com.atproto.repo.getRecord", httpMethod: "GET", count: 2 },
-      { xrpcMethod: "com.atproto.repo.putRecord", httpMethod: "POST", count: 2 },
-    ],
-    options
-  );
-}
-
 export async function latrGatewayFetch(
   oauthSession: OAuthSession,
   path: string,
@@ -193,6 +125,17 @@ export async function latrGatewayFetch(
   options?: LatrGatewayFetchOptions
 ): Promise<Response> {
   const gatewayPath = path.startsWith("/") ? path : `/${path}`;
+  const pathOnly = stripQueryAndFragment(gatewayPath);
+  const supportedPaths = new Set([
+    ...[LATR_XRPC.listBookmarks, LATR_XRPC.listTags, LATR_XRPC.getBookmark,
+      LATR_XRPC.saveBookmark, LATR_XRPC.setBookmarkTags, LATR_XRPC.renameBookmarkTag,
+      LATR_XRPC.deleteBookmarkTag, LATR_XRPC.syncBookmarkMetadata, LATR_XRPC.setBookmarkState,
+      LATR_XRPC.deleteBookmark, LATR_XRPC.migrateBookmarks, LATR_XRPC.getOpenGraph,
+      LATR_XRPC.resolveUrl, LATR_XRPC.authProbe].map(latrXrpcPath),
+  ]);
+  if (!supportedPaths.has(pathOnly)) {
+    throw new Error("Unsupported L@tr gateway endpoint; use the bookmarks XRPC API");
+  }
   const config = resolveLatrGatewayConfig();
   if (!options?.skipClientCredential) {
     assertLatrGatewayClientCredential(config);
@@ -201,7 +144,6 @@ export async function latrGatewayFetch(
   const method = init?.method ?? "GET";
   const clientHeaders = latrGatewayClientHeaders(config);
 
-  const upstream = pdsXrpcMethodForGatewayRequest(method, gatewayPath);
   const gatewayPathOnly = stripQueryAndFragment(gatewayPath);
   const bookmarkProofPlan = bookmarkUpstreamProofPlanForGatewayRequest(
     method,
@@ -248,100 +190,9 @@ export async function latrGatewayFetch(
         "GET",
         proofOptions
       );
-  } else if (
-    method === "POST" &&
-    (gatewayPathOnly === LATR_GATEWAY_SAVES_PATH || XRPC_SAVE_PATHS.has(gatewayPathOnly))
-  ) {
-    upstreamHeaders[LATR_UPSTREAM_DPOP_HEADER] =
-      await createSaveUpstreamDpopProofPool(oauthSession, proofOptions);
-  } else if (
-    method === "POST" &&
-    gatewayPathOnly === LATR_GATEWAY_MIGRATE_LEXICONS_PATH
-  ) {
-    // This proof pool contains enough JWTs for the legacy copy/delete pass and
-    // can exceed reverse-proxy header limits. The gateway accepts it in the
-    // request body for this endpoint while retaining header support for older
-    // clients.
-    requestBody = JSON.stringify({
-      upstreamDpopProof: await createMigrateLexiconsUpstreamDpopProofPool(
-        oauthSession,
-        proofOptions
-      ),
-    });
-    upstreamHeaders["Content-Type"] = "application/json";
-  } else if (
-    method === "POST" &&
-    gatewayPathOnly === latrXrpcPath(LATR_XRPC.migrateLegacy)
-  ) {
-    upstreamHeaders[LATR_UPSTREAM_DPOP_HEADER] =
-      await createMigrateLexiconsUpstreamDpopProofPool(oauthSession, proofOptions);
-  } else if (method === "GET" && gatewayPathOnly === LATR_GATEWAY_SAVES_PATH) {
-    // Paged requests (`?limit=`) trigger a single upstream listRecords call;
-    // the bare path drains every page and needs the full proof pool.
-    const queryIndex = gatewayPath.indexOf("?");
-    const search = new URLSearchParams(
-      queryIndex === -1 ? "" : gatewayPath.slice(queryIndex + 1)
-    );
-    upstreamHeaders[LATR_UPSTREAM_DPOP_HEADER] = search.has("limit")
-      ? await createUpstreamDpopProof(
-          oauthSession,
-          "com.atproto.repo.listRecords",
-          "GET",
-          proofOptions
-        )
-      : await createListSavesUpstreamDpopProofPool(oauthSession, proofOptions);
-  } else if (
-    method === "GET" &&
-    gatewayPathOnly === latrXrpcPath(LATR_XRPC.listItems)
-  ) {
+  } else if (method === "GET" && gatewayPathOnly === latrXrpcPath(LATR_XRPC.authProbe)) {
     upstreamHeaders[LATR_UPSTREAM_DPOP_HEADER] = await createUpstreamDpopProof(
-      oauthSession,
-      "com.atproto.repo.listRecords",
-      "GET",
-      proofOptions
-    );
-  } else if (
-    method === "POST" &&
-    gatewayPathOnly === latrXrpcPath(LATR_XRPC.setState)
-  ) {
-    upstreamHeaders[LATR_UPSTREAM_DPOP_HEADER] =
-      await createSetStateUpstreamDpopProofPool(oauthSession, proofOptions);
-  } else if (
-    method === "POST" &&
-    gatewayPathOnly === latrXrpcPath(LATR_XRPC.deleteItem)
-  ) {
-    upstreamHeaders[LATR_UPSTREAM_DPOP_HEADER] = await createUpstreamDpopProof(
-      oauthSession,
-      "com.atproto.repo.deleteRecord",
-      "POST",
-      proofOptions
-    );
-  } else if (
-    method === "GET" &&
-    gatewayPathOnly === latrXrpcPath(LATR_XRPC.getItem)
-  ) {
-    upstreamHeaders[LATR_UPSTREAM_DPOP_HEADER] = await createUpstreamDpopProof(
-      oauthSession,
-      "com.atproto.repo.getRecord",
-      "GET",
-      proofOptions
-    );
-  } else if (
-    method === "GET" &&
-    gatewayPathOnly === latrXrpcPath(LATR_XRPC.authProbe)
-  ) {
-    upstreamHeaders[LATR_UPSTREAM_DPOP_HEADER] = await createUpstreamDpopProof(
-      oauthSession,
-      "com.atproto.repo.listRecords",
-      "GET",
-      proofOptions
-    );
-  } else if (upstream) {
-    upstreamHeaders[LATR_UPSTREAM_DPOP_HEADER] = await createUpstreamDpopProof(
-      oauthSession,
-      upstream.xrpcMethod,
-      upstream.httpMethod,
-      proofOptions
+      oauthSession, "com.atproto.server.getSession", "GET", proofOptions
     );
   }
 

@@ -61,7 +61,6 @@ export default defineConfig({
       "package.json",
       "bun.lockb",
       "apps/extension/package.json",
-      "apps/latrkit-dev/package.json",
       "apps/web/package.json",
       "apps/extension/tsconfig.json",
       "apps/extension/wxt.config.ts",

@@ -1,6 +1,6 @@
 name: CI
 
-# Railway deploys linked Git revisions. GitHub Actions verifies source changes
+# Vercel deploys branch previews and main production. GitHub Actions verifies source changes
 # and never connects to hosted databases or deploys infrastructure.
 on:
   push:
@@ -22,16 +22,21 @@ jobs:
   ci-gateway:
     name: Gateway test and build
     runs-on: ubuntu-latest
-    container: swift:6.4-jammy
     steps:
       - uses: actions/checkout@v6
-      - name: Install gateway test dependencies
-        run: apt-get update && apt-get install -y --no-install-recommends libsqlite3-dev python3
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: services/go-backend/go.mod
+          cache-dependency-path: services/go-backend/go.sum
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - run: bun install --frozen-lockfile
       - name: Run gateway CI
-        run: bash scripts/ci-gateway.sh
+        run: bash scripts/ci-go.sh
 
   ci-js:
-    name: Web, console, and extension test and build
+    name: Web and extension test and build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

@@ -304,114 +304,9 @@ public enum LatrXRPCRoutes {
         on xrpc: RouterGroup<BasicRequestContext>,
         services: GatewayServices
     ) {
-        xrpc.get(RouterPath(LatrXRPCMethod.listDeveloperClients.rawValue)) { request, _ in
-            await handleDeveloper(
-                request: request,
-                services: services,
-                errorResponder: xrpcErrorResponse
-            ) { auth in
-                try validateQueryParameters(request, allowed: [])
-                return try xrpcJSONResponse(try await DeveloperOperations.listClients(auth: auth, services: services))
-            }
-        }
-
-        xrpc.post(RouterPath(LatrXRPCMethod.createDeveloperClient.rawValue)) { request, _ in
-            await handleDeveloper(
-                request: request,
-                services: services,
-                errorResponder: xrpcErrorResponse
-            ) { auth in
-                let input = try await decodeXRPCInput(request, as: CreateDeveloperClientBody.self)
-                return try xrpcJSONResponse(
-                    try await DeveloperOperations.createClient(
-                        clientID: input.clientId,
-                        displayName: input.displayName,
-                        auth: auth,
-                        services: services
-                    )
-                )
-            }
-        }
-
-        xrpc.post(RouterPath(LatrXRPCMethod.deleteDeveloperClient.rawValue)) { request, _ in
-            await handleDeveloper(
-                request: request,
-                services: services,
-                errorResponder: xrpcErrorResponse
-            ) { auth in
-                let input = try await decodeXRPCInput(request, as: DeleteDeveloperClientInput.self)
-                return try xrpcJSONResponse(
-                    try await DeveloperOperations.deleteClient(
-                        clientID: input.clientId,
-                        auth: auth,
-                        services: services
-                    )
-                )
-            }
-        }
-
-        xrpc.get(RouterPath(LatrXRPCMethod.listDeveloperKeys.rawValue)) { request, _ in
-            await handleDeveloper(
-                request: request,
-                services: services,
-                errorResponder: xrpcErrorResponse
-            ) { auth in
-                try validateQueryParameters(request, allowed: ["clientId"])
-                return try xrpcJSONResponse(
-                    try await DeveloperOperations.listKeys(
-                        clientID: try requiredParameter(request, named: "clientId"),
-                        auth: auth,
-                        services: services
-                    )
-                )
-            }
-        }
-
-        xrpc.post(RouterPath(LatrXRPCMethod.createDeveloperKey.rawValue)) { request, _ in
-            await handleDeveloper(
-                request: request,
-                services: services,
-                errorResponder: xrpcErrorResponse
-            ) { auth in
-                let input = try await decodeXRPCInput(request, as: CreateDeveloperKeyInput.self)
-                return try xrpcJSONResponse(
-                    try await DeveloperOperations.createKey(
-                        clientID: input.clientId,
-                        label: input.label,
-                        auth: auth,
-                        services: services
-                    )
-                )
-            }
-        }
-
-        xrpc.post(RouterPath(LatrXRPCMethod.revokeDeveloperKey.rawValue)) { request, _ in
-            await handleDeveloper(
-                request: request,
-                services: services,
-                errorResponder: xrpcErrorResponse
-            ) { auth in
-                let input = try await decodeXRPCInput(request, as: RevokeDeveloperKeyInput.self)
-                return try xrpcJSONResponse(
-                    try await DeveloperOperations.revokeKey(
-                        clientID: input.clientId,
-                        keyID: input.keyId,
-                        auth: auth,
-                        services: services
-                    )
-                )
-            }
-        }
-
-        xrpc.get(RouterPath(LatrXRPCMethod.getDeveloperUsage.rawValue)) { request, _ in
-            await handleDeveloper(
-                request: request,
-                services: services,
-                errorResponder: xrpcErrorResponse
-            ) { auth in
-                try validateQueryParameters(request, allowed: [])
-                return try xrpcJSONResponse(try await DeveloperOperations.getUsage(auth: auth, services: services))
-            }
+        for method in LatrXRPCMethod.allCases where method.rawValue.hasPrefix("link.latr.developer.") {
+            xrpc.get(RouterPath(method.rawValue)) { _, _ in retiredDeveloperResponse() }
+            xrpc.post(RouterPath(method.rawValue)) { _, _ in retiredDeveloperResponse() }
         }
     }
 
@@ -421,6 +316,12 @@ public enum LatrXRPCRoutes {
         // verbs explicitly so XRPC callers always receive a JSON 405 response.
         for method in LatrXRPCMethod.allCases {
             let path = RouterPath(method.rawValue)
+            if method.rawValue.hasPrefix("link.latr.developer.") {
+                xrpc.put(path) { _, _ in retiredDeveloperResponse() }
+                xrpc.patch(path) { _, _ in retiredDeveloperResponse() }
+                xrpc.delete(path) { _, _ in retiredDeveloperResponse() }
+                continue
+            }
             switch method.kind {
             case .query:
                 xrpc.post(path) { _, _ in knownMethodWrongVerbResponse() }

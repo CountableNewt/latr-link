@@ -125,11 +125,11 @@ final class RouterTests: XCTestCase {
         try await httpClient.shutdown()
     }
 
-    func testDeveloperClientsRequireOAuth() async throws {
+    func testDeveloperClientsAreRetired() async throws {
         let (app, httpClient) = try makeApp()
         try await app.test(.router) { client in
             try await client.execute(uri: "/v1/latr/developer/clients", method: .get) { response in
-                XCTAssertEqual(response.status, .unauthorized)
+                XCTAssertEqual(response.status, .gone)
             }
         }
         try await httpClient.shutdown()
@@ -191,7 +191,7 @@ final class RouterTests: XCTestCase {
         try await httpClient.shutdown()
     }
 
-    func testDeveloperXRPCSkipsApplicationKeyPolicy() async throws {
+    func testDeveloperXRPCIsRetired() async throws {
         let config = GatewayConfig(
             port: 8080,
             appEnv: .test,
@@ -207,17 +207,17 @@ final class RouterTests: XCTestCase {
                 uri: "/xrpc/link.latr.developer.listClients",
                 method: .get
             ) { response in
-                XCTAssertEqual(response.status, .unauthorized)
+                XCTAssertEqual(response.status, .gone)
                 let object = try XCTUnwrap(
                     JSONSerialization.jsonObject(with: Data(buffer: response.body)) as? [String: Any]
                 )
-                XCTAssertEqual(object["error"] as? String, "AuthRequired")
+                XCTAssertEqual(object["error"] as? String, "developer_api_retired")
             }
         }
         try await httpClient.shutdown()
     }
 
-    func testDeveloperClientsSkipClientAPIKeyWhenOAuthPolicyEnabled() async throws {
+    func testDeveloperClientsAreRetiredWithClientPolicyEnabled() async throws {
         let config = GatewayConfig(
             port: 8080,
             appEnv: .test,
@@ -233,8 +233,8 @@ final class RouterTests: XCTestCase {
             try await client.execute(uri: "/v1/latr/developer/clients", method: .get) { response in
                 XCTAssertEqual(
                     response.status,
-                    .unauthorized,
-                    "Developer routes use OAuth only; missing session must be 401, not 403 from client API key policy"
+                    .gone,
+                    "Retired developer routes must return 410 before authentication"
                 )
             }
         }

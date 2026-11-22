@@ -70,7 +70,10 @@ function forwardedProto(req: Request): string {
 }
 
 function serverGatewayBaseUrl(req: Request): string {
-  const internal = process.env.LATR_GATEWAY_INTERNAL_URL?.trim();
+  const path = requestUrl(req).pathname.slice(LATR_GATEWAY_PROXY_BASE_PATH.length);
+  const metadata = path === "/xrpc/link.latr.preview.getOpenGraph" || path === "/xrpc/link.latr.discovery.resolveUrl";
+  const internal = (metadata ? process.env.LATR_METADATA_INTERNAL_URL : process.env.LATR_GATEWAY_INTERNAL_URL)?.trim()
+    || process.env.LATR_GATEWAY_INTERNAL_URL?.trim();
   if (internal) return internal.replace(/\/$/, "");
 
   const configured = process.env.NEXT_PUBLIC_LATR_GATEWAY_URL?.trim();
@@ -201,6 +204,9 @@ function forwardedRequestHeaders(req: Request): {
 }
 
 async function proxyLatrGateway(req: Request): Promise<Response> {
+  if ((process.env.VERCEL_ENV === "preview" || process.env.VERCEL_ENV === "production") && !process.env.LATR_GATEWAY_INTERNAL_URL?.trim()) {
+    return NextResponse.json({ error: "gateway_binding_unconfigured" }, { status: 503 });
+  }
   const url = requestUrl(req);
   const path = url.pathname.slice(LATR_GATEWAY_PROXY_BASE_PATH.length);
   const gatewayBase = serverGatewayBaseUrl(req);

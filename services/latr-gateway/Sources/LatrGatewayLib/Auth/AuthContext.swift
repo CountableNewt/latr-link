@@ -109,7 +109,9 @@ public func authenticateRequest(
         requireClientAPIKey: override,
         config: config
     )
-    let clientID = try await store.resolveClientID(
+    // Only server-configured official credentials remain valid after public API retirement.
+    let officialStore = InMemoryDeveloperStore(officialEnvCredentials: config.officialClientCredentials)
+    let clientID = try await officialStore.resolveClientID(
         from: request.headers,
         requireClientAPIKey: requireRegisteredClient
     )

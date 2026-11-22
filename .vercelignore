@@ -1,0 +1,15 @@
+.git
+.env*
+**/.env*
+**/node_modules
+**/.next
+**/.turbo
+**/.build
+**/DerivedData
+apps/apple
+services/latr-gateway
+**/.output
+**/data
+**/*.sqlite*
+**/*.db
+**/coverage

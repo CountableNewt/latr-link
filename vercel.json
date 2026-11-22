@@ -1,0 +1,41 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": ["iad1"],
+  "services": {
+    "web": {
+      "root": "apps/web",
+      "framework": "nextjs",
+      "installCommand": "cd ../.. && bun install --frozen-lockfile",
+      "buildCommand": "bun run build",
+      "bindings": [
+        { "type": "service", "service": "gateway", "format": "url", "env": "LATR_GATEWAY_INTERNAL_URL" },
+        { "type": "service", "service": "metadata", "format": "url", "env": "LATR_METADATA_INTERNAL_URL" }
+      ]
+    },
+    "gateway": {
+      "root": "services/go-backend",
+      "framework": "go",
+      "entrypoint": "cmd/gateway/main.go",
+      "buildCommand": "go build -o \"$VERCEL_OUTPUT_FILE\" ./cmd/gateway"
+    },
+    "metadata": {
+      "root": "services/go-backend",
+      "framework": "go",
+      "entrypoint": "cmd/metadata/main.go",
+      "buildCommand": "go build -o \"$VERCEL_OUTPUT_FILE\" ./cmd/metadata"
+    }
+  },
+  "rewrites": [
+    { "source": "/xrpc/link.latr.preview.getOpenGraph", "destination": { "service": "metadata" } },
+    { "source": "/xrpc/link.latr.discovery.resolveUrl", "destination": { "service": "metadata" } },
+    { "source": "/xrpc/(.*)", "destination": { "service": "gateway" } },
+    { "source": "/oauth/client-metadata.json", "destination": { "service": "gateway" } },
+    { "source": "/oauth/extension-client-metadata.json", "destination": { "service": "gateway" } },
+    { "source": "/v1/latr/(.*)", "destination": { "service": "gateway" } },
+    { "source": "/health", "destination": { "service": "gateway" } },
+    { "source": "/ready", "destination": { "service": "gateway" } },
+    { "source": "/internal/cleanup", "destination": { "service": "gateway" } },
+    { "source": "/(.*)", "destination": { "service": "web" } }
+  ],
+  "crons": [{ "path": "/internal/cleanup", "schedule": "23 4 * * *" }]
+}

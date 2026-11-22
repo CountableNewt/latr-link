@@ -139,7 +139,6 @@ function validateSourceArchive(path) {
     "package.json",
     "bun.lockb",
     "apps/extension/package.json",
-    "apps/latrkit-dev/package.json",
     "apps/web/package.json",
     "apps/extension/wxt.config.ts",
     "apps/extension/.env.store",
