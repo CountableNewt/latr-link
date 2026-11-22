@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -38,13 +39,13 @@ type Server struct {
 
 func FromEnvironment(kind string) (*Server, error) {
 	client := httpx.PublicClient(25 * time.Second)
+	clients, err := ParseClients(os.Getenv("LATR_GATEWAY_OFFICIAL_CLIENT_CREDENTIALS"))
+	if err != nil {
+		return nil, fmt.Errorf("LATR_GATEWAY_OFFICIAL_CLIENT_CREDENTIALS: %w", err)
+	}
 	store, err := storage.New(os.Getenv("TURSO_DATABASE_URL"), os.Getenv("TURSO_AUTH_TOKEN"), nil)
 	if err != nil {
 		return nil, err
-	}
-	clients := ParseClients(os.Getenv("LATR_GATEWAY_OFFICIAL_CLIENT_CREDENTIALS"))
-	if len(clients) == 0 {
-		return nil, errors.New("LATR_GATEWAY_OFFICIAL_CLIENT_CREDENTIALS must contain internal client credentials")
 	}
 	return &Server{Auth: &auth.Authenticator{HTTPClient: client, Replay: store, Clients: clients, ProxyKey: os.Getenv("LATR_GATEWAY_PROXY_SECRET")}, State: store, HTTP: client, Metadata: metadata.New(client), Kind: kind, CronSecret: os.Getenv("CRON_SECRET")}, nil
 }

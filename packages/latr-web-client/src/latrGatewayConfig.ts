@@ -29,17 +29,17 @@ export type LatrGatewayEnvConfig = {
   appEnv?: LatrAppEnv;
   /** When app env is dev, use testing gateway for this hostname. */
   testingHostname?: string;
-  /** Base64 official client credential (internal first-party; legacy header). */
+  /** Internal environment secret sent through the official client header. */
   clientCredential?: string;
-  /** Split developer API key auth (preferred for third-party and console-issued keys). */
+  /** Internal environment credentials for clients calling the gateway directly. */
   clientId?: string;
   apiKey?: string;
 };
 
-/** Server-injected bootstrap for hosted web apps (survives duplicate client bundles). */
+/** Public URL/environment bootstrap for hosted web apps; never contains secrets. */
 export type LatrGatewayWindowBootstrap = Pick<
   LatrGatewayEnvConfig,
-  "clientId" | "apiKey" | "clientCredential" | "gatewayUrl" | "appEnv"
+  "gatewayUrl" | "appEnv"
 >;
 
 declare global {
@@ -66,9 +66,6 @@ function mergeGatewayConfigWithWindowBootstrap(
   const bootstrap = readWindowGatewayBootstrap();
   if (!bootstrap) return config;
 
-  const clientId = bootstrap.clientId?.trim();
-  const apiKey = bootstrap.apiKey?.trim();
-  const clientCredential = bootstrap.clientCredential?.trim();
   const gatewayUrl = bootstrap.gatewayUrl?.trim();
   const keepConfiguredProxy =
     config.gatewayUrl?.trim() && isTrustedLatrGatewayProxyUrl(config.gatewayUrl.trim());
@@ -77,8 +74,6 @@ function mergeGatewayConfigWithWindowBootstrap(
     ...config,
     ...(bootstrap.appEnv ? { appEnv: bootstrap.appEnv } : {}),
     ...(gatewayUrl && !keepConfiguredProxy ? { gatewayUrl } : {}),
-    ...(clientCredential ? { clientCredential } : {}),
-    ...(clientId && apiKey ? { clientId, apiKey } : {}),
   };
 }
 
@@ -87,24 +82,23 @@ export function registerLatrGatewayConfigSync(fn: LatrGatewayConfigSync): void {
   gatewayConfigSync = fn;
 }
 
-export function hasRegisteredLatrGatewayConfigSync(): boolean {
-  return gatewayConfigSync !== undefined;
-}
-
 /** Refresh config from registered host sync, then return the active snapshot. */
 export function resolveLatrGatewayConfig(): LatrGatewayEnvConfig {
   gatewayConfigSync?.();
   return mergeGatewayConfigWithWindowBootstrap(globalGatewayConfig);
 }
 
-/** Persist credentials on `window` so all client bundles share the same runtime config. */
+/** Share public configuration across client bundles, discarding any legacy secrets. */
 export function publishLatrGatewayWindowBootstrap(
   bootstrap: LatrGatewayWindowBootstrap
 ): void {
   if (typeof window === "undefined") return;
+  const previous = readWindowGatewayBootstrap();
+  const gatewayUrl = bootstrap.gatewayUrl ?? previous?.gatewayUrl;
+  const appEnv = bootstrap.appEnv ?? previous?.appEnv;
   window.__LATR_GATEWAY_BOOTSTRAP__ = {
-    ...window.__LATR_GATEWAY_BOOTSTRAP__,
-    ...bootstrap,
+    ...(gatewayUrl !== undefined ? { gatewayUrl } : {}),
+    ...(appEnv !== undefined ? { appEnv } : {}),
   };
 }
 
@@ -249,16 +243,11 @@ export function assertLatrGatewayClientCredential(
   if (isLoopbackGatewayUrl(base)) return;
   if (isTrustedLatrGatewayProxyUrl(base)) return;
 
-  const bootstrap = readWindowGatewayBootstrap();
-  const bootstrapClientId = Boolean(bootstrap?.clientId?.trim());
-  const bootstrapApiKey = Boolean(bootstrap?.apiKey?.trim());
-  const bootstrapCredential = Boolean(bootstrap?.clientCredential?.trim());
   throw new Error(
     [
       "Hosted L@tr Gateway Requires Client Credentials.",
-      "Set LATR_GATEWAY_CLIENT_ID + LATR_GATEWAY_API_KEY (Split Headers) or LATR_GATEWAY_CLIENT_CREDENTIAL (Legacy Official Header).",
+      "Configure internal environment secrets on the gateway proxy or the direct client runtime.",
       "Configure Them on the Active Hosted Web Service for This Environment, Then Redeploy.",
-      `Diagnostic: bootstrapClientId=${bootstrapClientId}, bootstrapApiKey=${bootstrapApiKey}, bootstrapCredential=${bootstrapCredential}, configSync=${hasRegisteredLatrGatewayConfigSync()}.`,
     ].join(" ")
   );
 }

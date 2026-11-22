@@ -254,7 +254,10 @@ func TestAuthenticationErrorsUseXRPCNames(t *testing.T) {
 	}
 }
 func TestInternalClientsAcceptOnlyConfiguredCredentials(t *testing.T) {
-	clients := ParseClients("latr-link-web=YWJjZA==;the-social-wire-web=other")
+	clients, err := ParseClients("latr-link-web=YWJjZA==;the-social-wire-web=other")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tc := range []struct{ id, key, legacy, want string }{{"latr-link-web", "YWJjZA==", "", "latr-link-web"}, {"", "", "other", "the-social-wire-web"}, {"unknown", "other", "", ""}, {"latr-link-web", "wrong", "", ""}, {"", "", "unregistered", ""}} {
 		h := make(http.Header)
 		h.Set("X-Latr-Client-Id", tc.id)

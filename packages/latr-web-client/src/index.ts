@@ -36,7 +36,6 @@ export {
   assertLatrGatewayClientCredential,
   configureLatrGateway,
   getLatrGatewayConfig,
-  hasRegisteredLatrGatewayConfigSync,
   latrGatewayBaseUrl,
   latrGatewayClientHeaders,
   publishLatrGatewayWindowBootstrap,
@@ -56,8 +55,6 @@ export {
   LATR_XRPC,
   latrXrpcPath,
   type LatrXrpcMethod,
-  type LatrListItemsResponse,
-  type LatrLexiconMigrationResponse,
 } from "./xrpcMethods";
 export {
   latrGatewayFetch,

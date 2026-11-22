@@ -81,3 +81,34 @@ Sources: https://vercel.com/docs/services, https://vercel.com/docs/services/bind
 - Retained SQLite volumes: development `df730399-2380-41f8-b13b-05216e0dcdd2`, production `34de7484-51eb-4d2c-93a7-a9b0731703ec`. Postgres volume association `7262938f-46b8-40dd-aaa1-fa1a725bb261` remains present in both environment readbacks. Durable production/development SQLite snapshots remain in the ignored backup directory, mode 0600, with successful integrity checks.
 - All 25 public production/preview checks passed again after Railway shutdown, including readiness against Turso. Both app sites, APIs and retired-console redirects remain available. Temporary environment exports were removed after migration; no credentials are committed.
 - User-owned Apple changes, including the pre-existing staged `SaveAndTagsViews.swift` blob, were preserved. Only the independently compiled share-test harness fix was included in the release.
+
+## Internal client auth cleanup (2026-11-22)
+
+The Go gateway resolves client credentials exclusively from server-side
+`LATR_GATEWAY_OFFICIAL_CLIENT_CREDENTIALS`; Turso has no developer registry or key
+lookup. Set a random secret per client/environment and configure the matching
+`LATR_GATEWAY_CLIENT_CREDENTIAL` or split `LATR_GATEWAY_CLIENT_ID` /
+`LATR_GATEWAY_API_KEY` on the calling server. These variable/header names remain
+compatible with existing internal clients; no database provisioning is required.
+Use `client-id=old-secret|new-secret` for overlapping rotation, then remove the
+old value after callers are updated. Existing SHA-256 credential hashes remain
+supported. Invalid entries, duplicate client IDs, empty rotation values and
+malformed hashes fail startup without logging secrets.
+
+Removed the unused developer-management SDK and retired developer-database
+migration tooling. The legacy SQLite schema fixture remains solely to verify
+that current Turso migration excludes retired clients, keys and usage. Public
+window bootstrap accepts only gateway URL and app environment and ignores old
+credential fields; web/extension proxies inject their server secrets.
+
+MyContextProtocol and Linear tools are unavailable in this session; progress is
+recorded here pending access. Existing local Apple edits are excluded.
+
+Validation: Go race tests, vet, build, generated contracts and all 11 Turso
+migration tests passed. With Bun 1.3.14, web/shared-client/extension tests
+(238 total), lint, typechecks and canonical package tests (95 total) passed.
+Chrome/Firefox extension builds passed. Production web build passed with
+Webpack; the default Turbopack build is blocked by local worker-port permissions.
+Chrome automation could not acquire its already-running profile, so no browser
+acceptance is claimed for this cleanup. Independent diff review found no
+regressions. No native app source changed as part of this task.
