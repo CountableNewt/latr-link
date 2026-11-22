@@ -13,8 +13,7 @@
     "./latrGatewayClient": "./src/latrGatewayClient.ts",
     "./resolveSaveInput": "./src/resolveSaveInput.ts",
     "./latrRepo": "./src/latrRepo.ts",
-    "./saveCurrentUrl": "./src/saveCurrentUrl.ts",
-    "./developerGatewayClient": "./src/developerGatewayClient.ts"
+    "./saveCurrentUrl": "./src/saveCurrentUrl.ts"
   },
   "scripts": {
     "build": "node -e \"process.exit(0)\"",

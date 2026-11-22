@@ -66,56 +66,19 @@ sqlite3 /data/gateway-backup.sqlite 'PRAGMA integrity_check; PRAGMA foreign_key_
 Download backups off the service volume and retain them before releases. A volume
 snapshot is also useful, but must include the database and its WAL consistently.
 
-## Postgres to SQLite cutover
+## Archived Postgres to SQLite cutover
 
-The gateway database contains developer clients, API-key hashes and revocations,
-daily usage counters, and derived bookmark previews. Saved community bookmark
-records and their metadata sidecars remain on each user's PDS.
+The retired Swift gateway stored developer clients, API-key hashes, daily usage
+and derived previews in SQLite. Its Postgres-to-SQLite migration tool and tests
+are available in Git at revision `009e734`; run that tool only with the matching
+historical source and schema when recovering an old deployment. Current source
+has removed that tool because the Go services do not use the developer registry.
 
-For each environment, Development first:
-
-1. Build and test the SQLite revision before changing hosted configuration.
-2. Capture a Postgres backup and freeze Gateway writes by stopping the old Gateway.
-   Keep Web and console in maintenance during the freeze so no key issuance or
-   usage writes occur between the final snapshot and switching databases.
-3. From a trusted machine with `psql`, set `DATABASE_URL` to the source connection
-   privately (do not paste credentials into logs). Run:
-
-   ```bash
-   python3 scripts/migrate-gateway-to-sqlite.py \
-     --export-json /private/backup/latr-source.json \
-     --output /private/backup/latr-gateway.sqlite
-   ```
-
-   The script takes a single read-only repeatable-read snapshot of all four tables,
-   retains it with mode `0600`, builds a new private SQLite file from the same
-   schema used by Gateway, verifies every row/field plus integrity/foreign keys,
-   and publishes the destination atomically. It refuses existing output paths.
-   The runtime image also includes `python3 /usr/local/bin/migrate-gateway-to-sqlite`
-   for a private-network maintenance session with the same schema resource.
-   It prints counts only. For an offline retry, pass `--source-json` instead of
-   connecting to Postgres. Hash the snapshot and SQLite artifact for the cutover log.
-4. Attach the environment-specific `/data` volume to Gateway. Transfer the verified
-   file to `/data/latr-gateway.sqlite` while Gateway is stopped; confirm the file
-   checksum matches. Never replace a file while an SQLite process has it open.
-5. Set the SQLite variables above, remove the old Postgres pre-deploy override if
-   configured in the dashboard, and deploy the tested revision. `DATABASE_URL`
-   may remain temporarily only with the explicit `sqlite` backend selection.
-6. Verify `/health`, authentication with existing API keys, rejection of revoked
-   keys, console client/key lists, key issuance/revocation, daily limits and usage,
-   bookmark save/list/archive/delete, and preview reads. Compare all four row
-   counts before issuing mutations. Restart Gateway and repeat persistence checks.
-7. Resume traffic and observe Development before scheduling Production. Retain
-   Postgres and backups until acceptance and an agreed rollback window have passed.
-   Postgres teardown is a separate destructive action.
-
-Rollback before accepting new SQLite writes: stop Gateway, select
-`LATR_GATEWAY_DATABASE_BACKEND=postgres` with the original `DATABASE_URL`, then
-run the previous tested revision or the retained Postgres backend. Legacy Postgres
-schema upgrades still use `scripts/apply-database-migrations.sh` explicitly.
-After SQLite accepts writes, Postgres is stale: freeze traffic and reconcile all
-new client/key/revocation/usage changes before rollback. Never blindly route back
-to the old snapshot; doing so can reactivate revoked keys or lose newly issued keys.
+For current deployments, follow [the Vercel migration guide](vercel-migration.md)
+and use `scripts/turso-migrate.py` to apply the operational schema and transfer
+only unexpired public preview cache entries. Developer accounts, keys, usage and
+old replay claims must not be imported. Preserve historical backups for recovery;
+user bookmark records and reading metadata remain on the user's PDS.
 
 ## DNS sequence
 
