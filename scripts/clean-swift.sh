@@ -6,7 +6,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 SWIFT_PACKAGES=(
-  services/latr-gateway
+  apps/apple
 )
 
 for dir in "${SWIFT_PACKAGES[@]}"; do

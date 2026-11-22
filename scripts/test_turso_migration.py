@@ -25,7 +25,7 @@ SPEC = importlib.util.spec_from_file_location("turso_migrate", ROOT / "scripts/t
 MIGRATION = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MIGRATION)
 SCHEMA = (ROOT / "services/go-backend/migrations/001_operational.sql").read_text()
-SWIFT_SCHEMA = (ROOT / "services/latr-gateway/Sources/LatrGatewayLib/Database/sqlite-schema.sql").read_text()
+LEGACY_SCHEMA = (ROOT / "scripts/fixtures/legacy-gateway-sqlite-schema.sql").read_text()
 GO_STORAGE = (ROOT / "services/go-backend/internal/storage/turso.go").read_text()
 
 
@@ -86,7 +86,7 @@ class MigrationTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.source = pathlib.Path(self.temp.name) / "railway.sqlite"
         source = sqlite3.connect(self.source)
-        source.executescript(SWIFT_SCHEMA)
+        source.executescript(LEGACY_SCHEMA)
         source.execute("INSERT INTO developer_clients(client_id,owner_did) VALUES (?,?)",
                        ("retired-secret-client", "did:plc:retired"))
         source.execute("INSERT INTO developer_api_keys(key_id,client_id,key_hash) VALUES (?,?,?)",

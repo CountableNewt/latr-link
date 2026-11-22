@@ -15,12 +15,8 @@ TABLES = {
     "developer_usage_daily": ("client_id", "usage_date", "route_family", "request_count"),
     "bookmark_previews": ("subject_hash", "subject", "title", "description", "image_url", "site_name", "author", "updated_at", "expires_at"),
 }
-SCHEMA_CANDIDATES = (
-    Path(__file__).resolve().parents[1] / "services/latr-gateway/Sources/LatrGatewayLib/Database/sqlite-schema.sql",
-    Path(__file__).resolve().parent / "LatrGateway_LatrGatewayLib.bundle/sqlite-schema.sql",
-    Path(__file__).resolve().parent / "LatrGateway_LatrGatewayLib.resources/sqlite-schema.sql",
-)
-SCHEMA = next((path for path in SCHEMA_CANDIDATES if path.is_file()), SCHEMA_CANDIDATES[0])
+# Retained only for offline recovery of pre-Go backups; the hosted gateway uses Turso.
+SCHEMA = Path(__file__).resolve().parent / "fixtures/legacy-gateway-sqlite-schema.sql"
 
 
 def canonical(rows):

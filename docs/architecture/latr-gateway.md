@@ -1,191 +1,50 @@
 # L@tr gateway
 
-Server-side L@tr API (Swift/Hummingbird). Clients authenticate in two layers:
+L@tr.link deploys a Next.js frontend and two Go services together in one Vercel Services project. Git branch previews include matching frontend/backend revisions; `main` owns production. The Swift hosted server and public developer console are retired. Native Swift apps continue to use the remote LatrKit client library.
 
-1. **Application credential** — split headers `X-Latr-Client-Id` + `X-Latr-API-Key` (developer-issued keys from [latrkit.dev](../apps/latrkit-dev.md)), or legacy internal `X-Latr-Official-Client` for env-mapped first-party apps during migration.
-2. **User OAuth** — ATProto access token + RFC 9449 DPoP for the signed-in viewer; forwarded to the PDS for `com.atproto.repo.*` mutations.
+## Ownership and storage
 
-## Base URL
+`community.lexicon.bookmarks.bookmark` is authoritative for bookmarks. `link.latr.bookmarks.metadata` stores user state on the same PDS with the same record key. Unknown fields and optimistic CID checks are preserved during updates. Schema-invalid bookmark records are omitted from reads without changing their source records; pagination cursors are preserved even for empty filtered pages.
 
-| Environment | URL |
-|-------------|-----|
-| Local | `http://127.0.0.1:8080` (`NEXT_PUBLIC_LATR_GATEWAY_URL`) |
-| Development | `https://api.testing.latr.link` |
-| Production | `https://api.latr.link` |
+Turso stores only derived seven-day previews and atomic DPoP replay claims. Preview and production use separate databases. There is no developer account, key issuance, billing or usage registry. Existing first-party key hashes live in internal server configuration only.
 
-## Auth
+## Services
 
-### Developer API keys (preferred)
+| Service | Responsibility | Local command |
+| --- | --- | --- |
+| gateway | Bookmark/tag/state operations, PDS writes, legacy record migration | `cd services/go-backend && go run ./cmd/gateway` |
+| metadata | Bounded SSRF-protected Open Graph, discovery and federated previews | `cd services/go-backend && go run ./cmd/metadata` |
+| web | Next.js UI, OAuth metadata and server-only credential proxy | `bun run --cwd apps/web dev` |
 
-Third-party and [latrkit.dev](https://github.com/Stygian-Tech/latrkit-dev)-issued clients send:
+The Go services share auth, PDS transport and metadata packages. They do not call a network auth service or validate the same DPoP proof twice. Save-time enrichment uses the metadata package locally; standalone metadata requests route to the metadata service.
 
-| Header | Description |
-|--------|-------------|
-| `X-Latr-Client-Id` | Registered client id (`^[a-z][a-z0-9_-]{0,62}$`) |
-| `X-Latr-API-Key` | Opaque key (`lk_…`), shown once at creation |
+## Authentication
 
-Keys are hashed at rest (SHA-256). Issue and rotate keys via **[latrkit.dev](https://github.com/Stygian-Tech/latrkit-dev)** or the developer management API (OAuth-protected).
+Each API call requires an internally configured first-party credential and the viewer's ATProto OAuth token plus DPoP proof. Split headers are `X-Latr-Client-Id` and `X-Latr-API-Key`; `X-Latr-Official-Client` remains supported for internal callers. There is no registration endpoint.
 
-When `LATR_GATEWAY_REQUIRE_CLIENT_API_KEY=true` (default in `APP_ENV=prod`), these headers (or legacy official header below) are required on every `/v1/latr/*` route except developer management routes.
+The browser and native apps use the same-origin `/api/latr-gateway/*` proxy. It injects server credentials and signs the public method/URL with `LATR_GATEWAY_PROXY_SECRET`; Go validates that HMAC before using the public URL for DPoP binding across Vercel's internal hop. Never expose official credentials or the proxy key as `NEXT_PUBLIC_*`.
 
-### Legacy env credentials (migration)
+The verifier binds the access token issuer to the viewer's DID-discovered PDS authorization servers, checks token expiry/signature/key binding and request method/URL/token hash, and claims each proof atomically in Turso. Unsupported public token verification falls back to PDS authority checks; enrichment/auth probes attest the PDS session. Every authenticated upstream call consumes its own correctly targeted client-minted proof.
 
-Legacy first-party apps may still use:
+## Current APIs
 
-| Header | Description |
-|--------|-------------|
-| `X-Latr-Official-Client` | Base64 credential from env map `LATR_GATEWAY_OFFICIAL_CLIENT_CREDENTIALS` |
+All operational methods use `/xrpc/`:
 
-Register new clients (including first-party apps) through **[latrkit.dev](https://github.com/Stygian-Tech/latrkit-dev)** like any other developer: create a client, issue an API key, and configure `X-Latr-Client-Id` + `X-Latr-API-Key` in your app. Client records are not labeled differently in the console or management API.
+| Method | NSID |
+| --- | --- |
+| GET | `link.latr.bookmarks.listBookmarks`, `listTags`, `getBookmark` |
+| POST | `link.latr.bookmarks.saveBookmark`, `syncMetadata`, `setTags`, `renameTag`, `deleteTag`, `deleteBookmark`, `migrateLegacy` |
+| PATCH | `link.latr.bookmarks.setState` |
+| GET | `link.latr.preview.getOpenGraph`, `link.latr.discovery.resolveUrl`, `link.latr.auth.probe` |
 
-Local development (`APP_ENV=local`) skips client credentials by default.
+Bookmark NSIDs without a full prefix in the table use `link.latr.bookmarks.`. Legacy `/v1/latr/*`, `link.latr.saved.*` and `link.latr.developer.*` return 410 and have no operation handlers. The old Next.js `/api/og-preview` and `/api/at-uri-from-url` fetch endpoints are removed.
 
-### Developer management API (OAuth + DPoP)
+Input validation is generated from the pinned canonical `latr-packages` dependency by `scripts/generate-go-contracts.py`; do not copy lexicon JSON into this repository. Query/property/verb/size checks and private no-store responses are enforced at the gateway. Migration proof pools can use the `upstreamDpopProof` JSON transport field to avoid proxy header limits.
 
-Authenticated with the operator’s ATProto session only (no app API key):
+## Deployment and operations
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/v1/latr/developer/clients` | List clients owned by signed-in DID |
-| POST | `/v1/latr/developer/clients` | Create developer client (`clientId` slug; optional `displayName`, any Unicode) |
-| DELETE | `/v1/latr/developer/clients/:clientId` | Delete developer client |
-| GET | `/v1/latr/developer/clients/:clientId/keys` | List API keys |
-| POST | `/v1/latr/developer/clients/:clientId/keys` | Create API key (shown once) |
-| DELETE | `/v1/latr/developer/clients/:clientId/keys/:keyId` | Revoke key |
-| GET | `/v1/latr/developer/usage` | Usage summary (preview limits) |
+See [Vercel migration and cutover](../deployment/vercel-migration.md) and the [environment template](../../services/go-backend/.env.example). Schema application and read-only SQLite cache transfer use `scripts/turso-migrate.py`. The daily authenticated cleanup job bounds expired claim/cache deletion. `/health` checks the process; `/ready` checks its operational store.
 
-### User OAuth + DPoP
+The server uses a 55-second application deadline. Vercel manages ingress socket lifetimes; standalone servers retain normal HTTP timeouts. Public pages/library shells prerender statically; API and OAuth metadata routes remain dynamic. Preview OAuth metadata must be fetchable without Vercel Authentication, so only the selected branch domain gets an exception.
 
-All `/xrpc/link.latr.*` and `/v1/latr/*` save/list routes also require:
-
-- `Authorization: DPoP <access-token-jwt>` (or `Bearer`)
-- `DPoP: <dpop-proof-jwt>` bound to the gateway request
-- Optional `X-ATProto-Upstream-DPoP: <dpop-proof-jwt[, ...]>` — one PDS-bound proof per write-through call
-
-`POST /xrpc/link.latr.bookmarks.migrateLegacy` needs a larger proof pool for its atomic migration pass. Current clients send that pool in the JSON `upstreamDpopProof` transport field to stay below reverse-proxy header limits.
-
-Tag calls use the immutable proof plans published by `latr-packages`: `listTags` uses one `listRecords` proof; `setTags` uses three `getRecord` proofs plus one `applyWrites` proof; and each bounded `renameTag`/`deleteTag` call uses one `listRecords` proof plus one `applyWrites` proof. The latter proof may remain unused when a scanned page has no matches.
-
-### Auth probe
-
-`POST /v1/latr/auth/probe` — lists one saved item via PDS to confirm write-through credentials. Response includes `clientId` when app credential auth is active.
-
-## Routes
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/health` | Public health check |
-| GET | `/xrpc/link.latr.bookmarks.listBookmarks?limit=&cursor=&tag=` | Page bookmark views, optionally exact-filtered by tag; a short/empty page can still return a cursor |
-| GET | `/xrpc/link.latr.bookmarks.listTags?limit=&cursor=` | Count exact tags in one bounded bookmark page |
-| GET | `/xrpc/link.latr.bookmarks.getBookmark?subject=` | Exact-subject lookup |
-| POST | `/xrpc/link.latr.bookmarks.saveBookmark` | Idempotent exact-subject save |
-| POST | `/xrpc/link.latr.bookmarks.syncMetadata` | Reconcile one bookmark page with same-rkey L@tr metadata |
-| PATCH | `/xrpc/link.latr.bookmarks.setState` | Update metadata state using bookmark URI |
-| POST | `/xrpc/link.latr.bookmarks.setTags` | Replace a bookmark's complete tag array using its URI and current CID |
-| POST | `/xrpc/link.latr.bookmarks.renameTag` | Rename an exact tag in bounded batches of at most 25 records; resume the opaque cursor through verification |
-| POST | `/xrpc/link.latr.bookmarks.deleteTag` | Delete an exact tag in bounded batches of at most 25 records; resume the opaque cursor through verification |
-| POST | `/xrpc/link.latr.bookmarks.deleteBookmark` | Atomically delete bookmark and metadata by URI |
-| POST | `/xrpc/link.latr.bookmarks.migrateLegacy` | Retry-safe legacy migration with counts and cursor |
-| POST | `/v1/latr/auth/probe` | Authenticated PDS connectivity check |
-| GET/POST/PATCH/DELETE | `/v1/latr/*` save routes | One-release deprecated adapters over bookmark XRPC; never write legacy collections |
-| GET | `/v1/latr/saves/subject?subjectUri=` | Lookup saved item by subject |
-| PATCH | `/v1/latr/saves/:itemRkey/state` | Body: `{ state: "unread" \| "archived" }` |
-| DELETE | `/v1/latr/saves/:itemRkey` | Unsave (item edge only) |
-| GET | `/v1/latr/discover/at-uri?url=` | Debug: HEAD AT URI + Bluesky URL normalization |
-| GET | `/v1/latr/og-preview?url=` | Server OG fetch (SSRF guarded) |
-
-Developer management routes are listed above.
-
-Record mutations are implemented in Swift **LatrKit** (`SavedLibrary`). `community.lexicon.bookmarks.bookmark` is authoritative, `link.latr.bookmarks.metadata` stores user state, and Open Graph previews are service-derived cache data rather than PDS record fields. See [the migration contract](community-bookmark-migration.md).
-
-**Client read path:** best-effort reconcile the requested page through **`POST /xrpc/link.latr.bookmarks.syncMetadata`**, then list it through **`GET /xrpc/link.latr.bookmarks.listBookmarks`**. Clients do not join community and metadata collections themselves, and a reconciliation failure does not hide community bookmarks.
-
-## Bookmark save pipeline
-
-Clients call **`POST /xrpc/link.latr.bookmarks.saveBookmark { subject, tags? }`**. The exact trimmed subject is stored; discovery and preview enrichment never replace an encountered HTTPS URL with an AT URI. Existing exact-subject records are adopted deterministically.
-
-The gateway fetches HTTP(S) Open Graph fields as best-effort cache enrichment. Cache failure never blocks the PDS bookmark write. A successful response has the same bookmark-view shape used by list and get:
-
-```json
-{
-  "uri": "at://did:plc:…/community.lexicon.bookmarks.bookmark/3m…",
-  "cid": "bafy…",
-  "value": {
-    "$type": "community.lexicon.bookmarks.bookmark",
-    "subject": "https://example.com/encountered",
-    "createdAt": "2026-08-13T20:00:00Z"
-  },
-  "metadataRecord": { "uri": "at://…/link.latr.bookmarks.metadata/3m…", "cid": "bafy…", "value": { "state": "unread" } },
-  "preview": { "title": "Example" }
-}
-```
-
-## Environment variables
-
-Full template: [`services/latr-gateway/.env.example`](../../services/latr-gateway/.env.example).
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `PORT` | No | `8080` | HTTP listen port |
-| `APP_ENV` | No | `local` | `local`, `dev`, `prod`, or `test` |
-| `PLC_URL` | No | `https://plc.directory` | PLC directory base URL |
-| `LATR_GATEWAY_APPVIEW_URLS` | No | `https://public.api.bsky.app` | Fallback AppView bases after DID-document discovery |
-| `LATR_GATEWAY_IDENTITY_URL` | No | `https://bsky.social` | Identity relay for handle → DID resolution |
-| `OAUTH_GATEWAY_REQUIRE_KNOWN_CLIENT` | No | `true` when `APP_ENV=prod` | Require registered gateway client id + API key from the developer store |
-| `LATR_GATEWAY_REQUIRE_CLIENT_API_KEY` | No | `true` when `APP_ENV=prod` | Require app credential headers |
-| `LATR_GATEWAY_OFFICIAL_CLIENT_CREDENTIALS` | No | _(empty)_ | Internal legacy `client-id=base64` pairs |
-| `LATR_GATEWAY_DATABASE_BACKEND` | No | `sqlite` | Persistence backend; explicit `postgres` supports rollback |
-| `LATR_GATEWAY_SQLITE_PATH` | Yes on Railway | `./data/latr-gateway.sqlite` locally | SQLite database for developer data and bookmark previews; Railway volume at `/data` |
-| `DATABASE_URL` | Postgres backend only | _(empty)_ | Private rollback Postgres URL; never implicitly selects Postgres |
-| `LATR_GATEWAY_DEVELOPER_STORE_PATH` | No | `./data/developer-store.json` | Legacy JSON import source; no longer the default persistence backend |
-| `LATR_GATEWAY_CLIENT_REGISTRY_PATH` | No | `./data/client-registry.json` | Legacy JSON registry (deprecated) |
-
-**L@tr web** — `LATR_GATEWAY_CLIENT_CREDENTIAL` or split `LATR_GATEWAY_CLIENT_ID` + `LATR_GATEWAY_API_KEY` are server-only secrets. Browser calls go to the same-origin Next.js proxy at `/api/latr-gateway/*`; the proxy forwards OAuth/DPoP headers and injects gateway client credentials server-side.
-
-On Railway, set `LATR_GATEWAY_INTERNAL_URL=http://${{Gateway.RAILWAY_PRIVATE_DOMAIN}}:8080`
-on Web. This changes only the server-to-server hop; browser-visible OAuth/DPoP
-identities continue to use the public custom domains.
-
-**The Social Wire** — `NEXT_PUBLIC_LATR_GATEWAY_CLIENT_ID` + `NEXT_PUBLIC_LATR_GATEWAY_API_KEY` (preferred) or legacy `NEXT_PUBLIC_LATR_GATEWAY_CLIENT_CREDENTIAL`.
-
-## Local development
-
-```bash
-# Terminal 1 — gateway
-cd services/latr-gateway && swift run LatrGateway
-
-# Terminal 2 — latrkit.dev console
-cd apps/latrkit-dev && bun run dev
-
-# Terminal 3 — L@tr.link web
-cd apps/web && bun run dev
-```
-
-SQLite schema migration runs at startup. Hosted environments require an explicit
-persistent database path. Existing JSON files are not silently imported. Stop the
-local Gateway and convert its legacy store while retaining the original JSON:
-
-```bash
-python3 scripts/migrate-gateway-to-sqlite.py \
-  --legacy-developer-json services/latr-gateway/data/developer-store.json \
-  --output services/latr-gateway/data/latr-gateway.sqlite
-```
-
-Use the actual path from `LATR_GATEWAY_DEVELOPER_STORE_PATH` if customized.
-The converter preserves client IDs, API-key hashes and revocations, and usage;
-unlimited Swift `Int.max` limits become the database's equivalent `Int32.max`.
-Legacy preview caches were in memory and have no data to copy. Start Gateway
-with `LATR_GATEWAY_SQLITE_PATH` set explicitly to the converted file. Keep the
-JSON backup until authentication, limits, and restart persistence pass. The
-converter rejects malformed entries and foreign-key orphans. Older JSON stores
-can retain usage for deleted clients; reconcile those historical entries in a
-separate copy of the JSON before retrying, retaining the original for audit.
-
-## Railway deployment
-
-Railway builds Gateway from `/railway/gateway.json`. Attach an environment-local
-volume at `/data`, set `LATR_GATEWAY_SQLITE_PATH=/data/latr-gateway.sqlite`, select
-`LATR_GATEWAY_DATABASE_BACKEND=sqlite`, and use one replica. Application startup
-migrates the database after the volume is mounted. GitHub Actions runs tests only
-and never mutates hosted data. See [the Railway runbook](../deployment/railway.md)
-for verified Postgres export/import, backups, and rollback constraints.
+The historical Railway runbook is retained solely for rollback evidence. The old Swift server source is available in Git history at `009e734`; legacy schema and metadata fixtures are preserved as tests.

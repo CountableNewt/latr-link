@@ -128,7 +128,7 @@ func TestGoldenProviderFixtures(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.file, func(t *testing.T) {
-			body, err := os.ReadFile(filepath.Join("../../../latr-gateway/Tests/LatrGatewayTests/Fixtures", tc.file))
+			body, err := os.ReadFile(filepath.Join("testdata", tc.file))
 			if err != nil {
 				t.Fatal(err)
 			}
