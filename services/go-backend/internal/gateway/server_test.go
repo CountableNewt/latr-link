@@ -279,7 +279,7 @@ func TestProbeCountsBookmarkedRecords(t *testing.T) {
 	s.HTTP = &http.Client{Transport: fakeTransport(func(r *http.Request) (*http.Response, error) {
 		records := []any{}
 		if r.URL.Query().Get("collection") == bookmarks.Collection {
-			records = append(records, map[string]any{"uri": "at://" + did + "/" + bookmarks.Collection + "/key", "cid": "cid", "value": map[string]any{"subject": "https://example.com/article", "createdAt": "2026-01-01T00:00:00Z"}})
+			records = append(records, map[string]any{"uri": "at://" + did + "/" + bookmarks.Collection + "/key", "cid": "cid", "value": map[string]any{"$type": bookmarks.Collection, "subject": "https://example.com/article", "createdAt": "2026-01-01T00:00:00Z"}})
 		}
 		return jsonHTTP(200, map[string]any{"records": records}), nil
 	})}
