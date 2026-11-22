@@ -149,31 +149,21 @@ func signedProxyURL(r *http.Request, proxyKey string) string {
 	}
 	return raw
 }
+
+// Only the connection authority and a cryptographically attested proxy URL can
+// satisfy DPoP target binding. Forwarded/original headers are caller-controlled.
 func requestURLs(r *http.Request, proxyKey string) []string {
 	scheme := "https"
-	if r.TLS == nil && (strings.HasPrefix(r.Host, "localhost") || strings.HasPrefix(r.Host, "127.0.0.1")) {
+	authority := (&url.URL{Host: r.Host}).Hostname()
+	ip := net.ParseIP(authority)
+	if r.TLS == nil && (authority == "localhost" || (ip != nil && ip.IsLoopback())) {
 		scheme = "http"
 	}
 	out := []string{scheme + "://" + r.Host + r.URL.RequestURI()}
 	if original := signedProxyURL(r, proxyKey); original != "" {
 		out = append(out, original)
 	}
-	host := strings.TrimSpace(strings.Split(r.Header.Get("X-Forwarded-Host"), ",")[0])
-	proto := strings.TrimSpace(strings.Split(r.Header.Get("X-Forwarded-Proto"), ",")[0])
-	if host != "" {
-		if proto != "https" && proto != "http" {
-			proto = scheme
-		}
-		out = append(out, proto+"://"+host+r.URL.RequestURI(), proto+"://"+host+"/api/latr-gateway"+r.URL.RequestURI())
-	}
-	for _, name := range []string{"X-Original-URL", "X-Original-URI", "X-Forwarded-URI", "X-Rewrite-URL"} {
-		if raw := r.Header.Get(name); raw != "" {
-			if strings.HasPrefix(raw, "/") {
-				raw = scheme + "://" + r.Host + raw
-			}
-			out = append(out, raw)
-		}
-	}
+
 	return out
 }
 func (a *Authenticator) client() *http.Client {

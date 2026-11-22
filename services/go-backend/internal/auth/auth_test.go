@@ -106,6 +106,24 @@ func TestAuthenticateSignatureReplayAndBinding(t *testing.T) {
 	if _, e = a.Authenticate(r, false); e == nil {
 		t.Fatal("wrong URL accepted")
 	}
+	for _, tc := range []struct{ name, header, value, target string }{
+		{"original URL changes route", "X-Original-URL", "https://gateway.test/xrpc/other", "https://gateway.test/xrpc/other"},
+		{"original URI changes route", "X-Original-URI", "/xrpc/other", "https://gateway.test/xrpc/other"},
+		{"forwarded URI changes route", "X-Forwarded-URI", "/xrpc/other", "https://gateway.test/xrpc/other"},
+		{"rewrite URL changes route", "X-Rewrite-URL", "https://gateway.test/xrpc/other", "https://gateway.test/xrpc/other"},
+		{"forwarded host changes origin", "X-Forwarded-Host", "spoof.test", "https://spoof.test/xrpc/list"},
+		{"forwarded host fabricates proxy", "X-Forwarded-Host", "spoof.test", "https://spoof.test/api/latr-gateway/xrpc/list"},
+		{"forwarded scheme changes origin", "X-Forwarded-Proto", "http", "http://gateway.test/xrpc/list"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r.Header.Set(tc.header, tc.value)
+			r.Header.Set("DPoP", makeProof(tc.target))
+			if _, err := a.Authenticate(r, false); err == nil {
+				t.Fatal("unsigned header authorized a different DPoP target")
+			}
+			r.Header.Del(tc.header)
+		})
+	}
 	r.Host = "internal.binding.vercel"
 	external := "https://branch-preview.vercel.app/api/latr-gateway/xrpc/list"
 	r.Header.Set("DPoP", makeProof(external))
