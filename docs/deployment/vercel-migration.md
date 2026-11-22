@@ -1,6 +1,6 @@
 # Go and Vercel migration
 
-Status as of 2026-11-22 19:47 UTC: testing web/API are on Vercel; production remains on Railway pending native CI setup fixes.
+Status: production and branch previews run on Vercel; all eight Railway service instances are offline with no active deployments. Cutover completed on 2026-11-22 after signed-in acceptance, full required CI and public DNS/TLS verification.
 
 ## Decisions
 
@@ -20,8 +20,8 @@ Status as of 2026-11-22 19:47 UTC: testing web/API are on Vercel; production rem
 - [x] Run Go race/vet/build, JavaScript tests/lint/typecheck/build and Chrome public-page validation. Signed-in save/list/tags/archive/unarchive passed, including a successful tag edit after ten idle minutes; approved test-record removal passed and remained removed after reload.
 - [x] Rehearse SQLite cache transfer (11 tests); copy and verify nine unexpired cache rows to separate Turso databases. No developer registry or third-party keys transferred. Five active hashes for the three existing first-party clients are retained only in internal secret configuration.
 - [x] Deploy preview and verify signed-in save/list/archive/unarchive/delete/tags. Removal returned 200 through Next.js and Go and remained removed after reload. Native/extension OAuth metadata and contract checks passed; separate signed-in native/Social Wire sessions were not exercised.
-- [ ] Back up Railway SQLite, migrate production cache, switch domains and verify production.
-- [ ] Stop Railway compute only after successful cutover; retain backups and volumes for rollback.
+- [x] Back up Railway SQLite, migrate production cache, switch domains and verify production.
+- [x] Stop all eight Railway service instances after successful cutover and DNS cache drain; retain services, configuration, backups and volumes for rollback.
 
 ## Availability and constraints
 
@@ -42,8 +42,8 @@ Sources: https://vercel.com/docs/services, https://vercel.com/docs/services/bind
 - Production SQLite backup: `/private/tmp/latr-cutover-20261122/production.sqlite`, directory mode 0700/file mode 0600; source quick-check passed. Durable production and development snapshots are retained under ignored `services/go-backend/data/retained-backups/2026-11-22/`, both integrity checks passed.
 
 - Compatibility domains `testing.latr.link` and `api.testing.latr.link` are branch assignments within the same project; preview configuration retains eight existing own-client key hashes plus its internal web credential. Production retains five own-client hashes. No public registration database is deployed.
-- `latrkit.dev` and `testing.latrkit.dev` are configured as redirects to `latr.link`; external DNS changes remain pending.
-- Railway Git sources for Web/Gateway/Console are disconnected in both environments. Existing deployments and volumes remain running until DNS/HTTPS acceptance.
+- `latrkit.dev` and `testing.latrkit.dev` redirect to `latr.link` (308). `www.latr.link` also redirects to the canonical apex. All seven app/API/testing/console domains are verified in Vercel with valid TLS.
+- Railway Git sources for Web/Gateway/Console are disconnected in both environments. Existing deployments and volumes remained available through DNS/HTTPS acceptance and cache drain; retain all volumes after stopping compute.
 - Future OAuth-enabled branches need a public branch/custom alias for authorization-server metadata fetches; do not disable protection project-wide. The stable migration alias exception does not expose arbitrary deployment URLs.
 
 ## Verification and fixes
@@ -62,4 +62,22 @@ Sources: https://vercel.com/docs/services, https://vercel.com/docs/services/bind
 - Testing web/API DNS changed to Vercel branch aliases. Both public OAuth metadata and TLS pass; Chrome desktop/mobile login/landing checks passed with loaded logos, no overflow and no console errors. Targeted protection exceptions cover the stable branch alias and the two testing aliases only.
 - Production app/API/www and retired console TLS certificates were issued using Marque TXT validation before changing their live addresses. Existing MX, identity/lexicon TXT records, nameservers and DNSSEC were preserved.
 - The production API TTL was reduced from 3600 to 60 seconds at approximately 19:17 UTC. Retain its old Railway gateway until at least 20:18 UTC to cover the earlier cache window. Testing web/API changed at approximately 19:13 UTC with prior TTL 3600; retain their old routes through 20:14 UTC.
-- Native CI on `6c6411e` initially failed before invoking our extension: the simulator share-sheet remote container was empty in `testSafariShareRetainsSignedOutDraft` (`LaunchTests.swift:107`). Core tests (33), Release build, and the other seven iPhone UI tests passed. The identical native source passed that share test in the preceding run. The single retry failed earlier in the same Safari setup because a late first-use TipView blocked the toolbar. This is outside the app/extension flow. Test-only commit `e4ed814` handles late guidance, waits for actual share-sheet contents and scopes its activity picker. Its simulator test build passed for arm64/x86_64; full runtime CI remains the release gate. Production remains held. User-owned Apple edits remain uncommitted and excluded.
+- Native CI on `6c6411e` initially failed before invoking our extension: the simulator share-sheet remote container was empty in `testSafariShareRetainsSignedOutDraft` (`LaunchTests.swift:107`). Core tests (33), Release build, and the other seven iPhone UI tests passed. The identical native source passed that share test in the preceding run. The single retry failed earlier in the same Safari setup because a late first-use TipView blocked the toolbar. This is outside the app/extension flow. Test-only commit `e4ed814` handles late guidance, waits for actual share-sheet contents and scopes its activity picker. Its simulator test build passed for arm64/x86_64. Final CI on `5838acc` passed all 33 core tests, Release build, eight iPhone UI tests and eight iPad UI tests, including share draft on both devices. No app assertions were skipped. User-owned Apple edits remain uncommitted and excluded.
+
+## Verified production release
+
+- PR [#93](https://github.com/CountableNewt/latr-link/pull/93) merged as `93d859581c8d57a81b067877733b23183e3c0673`. Its Git tree exactly matches tested feature revision `5838acc` (`efb26665af26987744d396678ac57ad2fe8d10c3`). [All required checks passed](https://github.com/CountableNewt/latr-link/actions/runs/45063360410).
+- Production-target deployment: `dpl_AswSMZC3J6bPDLpcEYtn12aRJ1JH`, built from merged `main`, with the production Turso resource. The earlier unaliased staging deployment is not the release.
+- Final DPoP review removed every unsigned forwarded/original URL fallback. Only the actual request authority/path or a valid HMAC-attested proxy URL may match. Seven spoofed-header cases and full Go race/vet/build passed; signed-in hosted reads returned 200 through both layers on this strict build.
+- All 25 public checks passed without deployment bypass: Vercel edge routing/TLS, logos, web/iOS/extension OAuth metadata, private/no-store API authentication, retired endpoints and canonical redirects.
+- Chrome production landing/login passed at desktop and mobile sizes: loaded logos, no development ribbon, no overflow and no console errors. Signed-in preview save/list/tags/archive/unarchive/delete acceptance passed; the approved test bookmark remained removed after reload.
+- Both existing Social Wire proxies (production and testing) reach Go and receive `AuthRequired`, confirming their internally configured keys are accepted. Separate signed-in Social Wire/native sessions were not exercised.
+- Marque changes: apex A records `216.198.79.1`/`64.29.17.1` and app CNAMEs `75d0a22885ccc236.vercel-dns-017.com`. Existing mail/identity/lexicon records and DNSSEC were preserved. Managed certificates were issued with DNS validation before switching app addresses.
+
+## Railway retirement
+
+- After the DNS drain at 20:30 UTC, Web, Gateway, Developer Console and Postgres were stopped in both development and production with project/env/service-scoped `railway down`. No services, projects, volumes or backups were deleted. Both environments report all four services offline and `activeDeployments=[]`.
+- Git sources remain disconnected for the three repo-backed services, preventing a later `main` push from restarting the retired infrastructure. Postgres image configuration remains retained.
+- Retained SQLite volumes: development `df730399-2380-41f8-b13b-05216e0dcdd2`, production `34de7484-51eb-4d2c-93a7-a9b0731703ec`. Postgres volume association `7262938f-46b8-40dd-aaa1-fa1a725bb261` remains present in both environment readbacks. Durable production/development SQLite snapshots remain in the ignored backup directory, mode 0600, with successful integrity checks.
+- All 25 public production/preview checks passed again after Railway shutdown, including readiness against Turso. Both app sites, APIs and retired-console redirects remain available. Temporary environment exports were removed after migration; no credentials are committed.
+- User-owned Apple changes, including the pre-existing staged `SaveAndTagsViews.swift` blob, were preserved. Only the independently compiled share-test harness fix was included in the release.
