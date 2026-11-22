@@ -17,7 +17,7 @@ Status: implementation in progress; Railway remains authoritative until cutover 
 - [x] Remove public registration and retire developer console from deployment/build.
 - [x] Make browser API calls deployment-local and verify OAuth metadata is publicly fetchable through a branch-domain protection exception. Other preview domains remain protected.
 - [x] Configure Services routing, server-only credentials, production and branch preview isolation.
-- [x] Run Go race/vet/build, JavaScript tests/lint/typecheck/build and Chrome public-page validation. Signed-in workflow acceptance continues below.
+- [x] Run Go race/vet/build, JavaScript tests/lint/typecheck/build and Chrome public-page validation. Signed-in save/list/tags/archive/unarchive passed, including a successful tag edit after ten idle minutes; removal awaits test-data cleanup approval.
 - [x] Rehearse SQLite cache transfer (11 tests); copy and verify nine unexpired cache rows to separate Turso databases. No developer registry or third-party keys transferred. Five active hashes for the three existing first-party clients are retained only in internal secret configuration.
 - [ ] Deploy preview and verify signed-in save/list/archive/delete/tags and external clients.
 - [ ] Back up Railway SQLite, migrate production cache, switch domains and verify production.
@@ -39,7 +39,12 @@ Sources: https://vercel.com/docs/services, https://vercel.com/docs/services/bind
 - Services: `web` (Next.js 16.4.5/Turbopack), `gateway` (Go), `metadata` (Go), all in `iad1`.
 - Turso integration resources: `latr-link-preview` (Preview/Development only), `latr-link-production` (Production only), both $0 Starter. No paid plan or overages enabled.
 - Branch alias: https://latr-link-git-feature-sqlite-gateway-sam-clemente-s-team.vercel.app . This alias alone has a deployment-protection exception so OAuth servers can fetch metadata. Application authentication still applies.
-- Production SQLite backup: `/private/tmp/latr-cutover-20261122/production.sqlite`, directory mode 0700/file mode 0600; source quick-check passed. Retain a durable backup before shutdown.
+- Production SQLite backup: `/private/tmp/latr-cutover-20261122/production.sqlite`, directory mode 0700/file mode 0600; source quick-check passed. Durable production and development snapshots are retained under ignored `services/go-backend/data/retained-backups/2026-11-22/`, both integrity checks passed.
+
+- Compatibility domains `testing.latr.link` and `api.testing.latr.link` are branch assignments within the same project; preview configuration retains eight existing own-client key hashes plus its internal web credential. Production retains five own-client hashes. No public registration database is deployed.
+- `latrkit.dev` and `testing.latrkit.dev` are configured as redirects to `latr.link`; external DNS changes remain pending.
+- Railway Git sources for Web/Gateway/Console are disconnected in both environments. Existing deployments and volumes remain running until DNS/HTTPS acceptance.
+- Future OAuth-enabled branches need a public branch/custom alias for authorization-server metadata fetches; do not disable protection project-wide. The stable migration alias exception does not expose arbitrary deployment URLs.
 
 ## Verification and fixes
 
@@ -49,3 +54,5 @@ Sources: https://vercel.com/docs/services, https://vercel.com/docs/services/bind
 - Schema-invalid community bookmark rows are skipped while retaining pagination cursors, matching the previous decoder. Malformed source records are never modified.
 - Next.js was patched from 16.4.2 to 16.4.5 after verifying the November security advisory.
 - A companion Social Wire cleanup is prepared at `/private/tmp/social-wire-latr-bookmarks`, branch `codex/latr-bookmark-client`, commit `c5a3b9f1` (96 focused tests/typecheck/lint). Active web/native bookmark flows were already canonical; this removes remaining old helper/backfill paths.
+
+- Vercel ingress socket timeouts are disabled for the serverless runtime while application deadlines remain bounded. After ten idle minutes the hosted `setTags` request returned 200 through both Next.js and Go, with no retry. Standalone HTTP server timeouts remain configured.
