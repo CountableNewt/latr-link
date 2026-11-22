@@ -1,25 +1,76 @@
-# Community bookmark migration (LTR-13)
+# Community bookmarks and legacy migration
 
-`community.lexicon.bookmarks.bookmark` is the authoritative saved-bookmark record. Its TID record key is shared by the user-owned `link.latr.bookmarks.metadata` sidecar. The community record contains only `subject`, `createdAt`, and optional `tags`; archive state, note, last-opened time, and temporary migration provenance belong in the sidecar. Unknown fields are preserved on every read-modify-write.
+## Current records
 
-The gateway exposes `link.latr.bookmarks.listBookmarks`, `listTags`, `getBookmark`, `saveBookmark`, `syncMetadata`, `setState`, `setTags`, `renameTag`, `deleteTag`, `deleteBookmark`, and `migrateLegacy` under `/xrpc/<NSID>`. Views return the community record plus optional `metadataRecord` and service-derived `preview`. Preview data is cached by exact subject with no DID association; SQLite stores the cache alongside developer data; tests use an in-memory cache. The explicit Postgres backend remains available during the transition.
+`community.lexicon.bookmarks.bookmark` is the authoritative bookmark record.
+New bookmarks use TID record keys. The user-owned `link.latr.bookmarks.metadata`
+sidecar uses the same key and binds the exact bookmark URI and subject. The
+community record contains `subject`, `createdAt` and optional `tags`; reading
+state, notes, last-opened time and migration provenance belong in the sidecar.
+Updates preserve unknown fields and use CID guards on the user's PDS.
 
-Bookmark tags follow the community Lexicon contract. Authored boundaries are trimmed, empty tags are rejected, case and internal whitespace are preserved, and exact duplicates collapse while retaining first-seen order. A bookmark may contain at most 100 tags; each tag is limited to 64 graphemes and 640 UTF-8 bytes. `listBookmarks?tag=` applies an exact tag match to the current bounded bookmark page, so an empty filtered page can still return a cursor. `listTags` reports exact tag counts for one page of at most 100 scanned bookmarks; clients merge counts while following its cursor.
+The Go gateway exposes bookmark and tag operations under `/xrpc/link.latr.bookmarks.*`.
+Views return the community record plus optional `metadataRecord` and derived
+`preview`. Turso stores derived preview cache and atomic DPoP replay claims,
+with separate preview and production databases. It has no developer registry,
+API-key table or authoritative user bookmarks. See [gateway contracts](latr-gateway.md)
+for the current routes and HTTP verbs.
 
-`setTags` replaces a bookmark's complete tag array with a CID-guarded write. `renameTag` and `deleteTag` scan no more than 25 bookmarks per request and return `{ ok, scanned, matched, updated, cursor? }`. Callers must resume until `cursor` is absent. The opaque cursor includes a verification phase, so completion confirms that no source-tag records remain; a conflict is reported without hiding partial progress from earlier calls.
+## Tags and reconciliation
 
-`syncMetadata` is an explicit, idempotent procedure for community bookmarks created by other clients. It scans one bounded bookmark page, creates missing same-rkey metadata sidecars with the exact bookmark URI and subject and an initial unread state, preserves matching metadata, and leaves mismatched sidecars untouched. L@tr clients invoke it best-effort before each list page; a temporary reconciliation failure never hides the underlying community bookmark.
+Authored tag boundaries are trimmed; empty tags are rejected. Case and internal
+whitespace are preserved, and exact duplicates collapse in first-seen order.
+A bookmark accepts at most 100 tags, each limited to 64 graphemes and 640 UTF-8
+bytes. `listBookmarks?tag=` filters the current bounded bookmark page, so an
+empty filtered page can still have a cursor. `listTags` counts tags within one
+page of at most 100 scanned bookmarks; clients merge counts across pages.
 
-Migration scans both `com.latr.saved.*` and `link.latr.saved.*`. Wrapper records retain their original encountered HTTP(S) URL (falling back to `normalizedUrl`), while native records use a valid `linkedWebUrl` or retain their AT URI. Duplicate groups select the oldest community bookmark, union tags deterministically, and preserve state, note, and latest `lastOpenedAt`. Conflicting notes or unknown legacy fields leave the complete group untouched. Target writes and source-CID deletes use one `com.atproto.repo.applyWrites` transaction and are safe to retry with the returned subject cursor.
+`setTags` replaces the full tag array with a CID-guarded write. `renameTag` and
+`deleteTag` scan at most 25 bookmarks per request and return
+`{ ok, scanned, matched, updated, cursor? }`. Resume until the cursor is absent;
+its verification phase checks that no source-tag records remain. A conflict
+fails the current request; earlier successful requests remain applied.
 
-The `/v1/latr/*` save/list/state/delete routes are one-release adapters. They emit deprecation and successor headers and never create legacy records. Keep legacy delete OAuth scopes only until L@tr clients and TSW-48 have shipped XRPC.
+`syncMetadata` is an idempotent procedure for community bookmarks written by
+other clients. It scans one page of at most 100 bookmarks, creates missing
+same-key sidecars with an unread state, preserves matching sidecars and leaves
+mismatched sidecars untouched. Clients can invoke reconciliation before listing
+without hiding community bookmarks when reconciliation temporarily fails.
+Schema-invalid community records are omitted from reads without modifying them;
+repository cursors remain available for continued pagination.
 
-## Development rollout
+## Legacy record migration
 
-1. Publish and pin immutable `latr-packages` and `latr-kit` revisions.
-2. Deploy the gateway and web app to Railway development only.
-3. Reauthenticate a test account for community-bookmark and metadata write scopes.
-4. Migrate representative wrapper, native-web, and direct-AT records twice.
-5. Exercise tag listing beyond 100 records and rename/delete beyond 25 records, resuming every cursor through verification; inject one CID conflict and retry from the last successful cursor.
-6. Compare PDS community/metadata records with the rendered library; verify the second migration run is a no-op and no legacy records are created.
-7. Soak development before requesting separate production approval. Production migration and REST removal are not part of this rollout.
+`migrateLegacy` scans `com.latr.saved.*` and `link.latr.saved.*`. External wrappers
+retain their encountered HTTP(S) URL, falling back to `normalizedUrl`. Native
+items use an HTTP(S) `linkedWebUrl` when available, otherwise their AT URI.
+
+Legacy items are grouped by exact subject. Migration reuses the oldest existing
+community bookmark (URI breaks timestamp ties), or creates a new TID bookmark.
+It merges tags deterministically, keeps the oldest creation time and latest
+`lastOpenedAt`, preserves existing sidecar state/note and records legacy item
+URIs. Conflicting notes or unknown legacy fields skip the group rather than
+risk data loss. CID conflicts also increment `skippedConflict` and retain the
+source group for a later retry.
+
+Each group's target writes and source deletes share one
+`com.atproto.repo.applyWrites` transaction. Requests process at most 100 subject
+groups (default 25), returning a subject cursor when more remain. The service
+still scans the legacy collections to form groups; the limit bounds processed
+groups, not the initial repository scan. Continue with the returned cursor,
+inspect `skippedConflict`, and rerun from the beginning after resolving skipped
+groups. A completed rerun should be a no-op for successfully retired records.
+
+Legacy `/v1/latr/*`, `link.latr.saved.*` and developer-management endpoints are
+retired with HTTP 410. They are not compatibility mutation adapters. Published
+OAuth metadata retains legacy delete scopes for migration; keep client scope
+changes aligned and require reauthentication after changing them.
+
+## Verification
+
+Use a branch preview in the same Vercel project as production, with its own
+Turso credentials. Verify representative wrapper, linked-web and direct-AT
+records, repeat migration, and inspect both PDS collections. Exercise tag
+pagination and resume mutation cursors through verification, including CID
+conflicts. Follow [deployment guidance](../deployment/vercel-migration.md);
+Railway is historical rollback infrastructure, not the active development host.

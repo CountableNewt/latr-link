@@ -4,7 +4,7 @@
 
 - **Web (`apps/web`)** — Next.js frontend with browser ATProto OAuth and a same-origin credential proxy.
 - **Go backend (`services/go-backend`)** — Bookmark gateway and metadata service with OAuth/DPoP verification, PDS operations, previews and URL discovery.
-- **Apple app (`apps/apple`)** — iOS/macOS app, share extension, core library, tests and icon tooling. The remote Swift LatrKit dependency is used only by native clients.
+- **Apple app (`apps/apple`)** — iPhone/iPad app, share extension, tests and icon tooling, with a macOS-compatible core Swift package. The checked-in project defines iOS targets; it does not define a macOS application target. The remote Swift LatrKit dependency is used by native clients.
 - **Browser extension (`apps/extension`)** — Saves through the hosted credential proxy.
 - **`latr-packages`** — Canonical TypeScript gateway contracts, record keys and lexicons, pinned as a remote dependency.
 - **`packages/latr-web-client`** — Shared web/extension gateway and save helpers.

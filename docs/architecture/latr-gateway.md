@@ -20,9 +20,9 @@ The Go services share auth, PDS transport and metadata packages. They do not cal
 
 ## Authentication
 
-Each API call requires an internally configured first-party credential and the viewer's ATProto OAuth token plus DPoP proof. Split headers are `X-Latr-Client-Id` and `X-Latr-API-Key`; `X-Latr-Official-Client` remains supported for internal callers. There is no registration endpoint.
+Each operational XRPC call requires an internally configured first-party credential and the viewer's ATProto OAuth token plus DPoP proof. Health/readiness and public OAuth metadata are separate routes; cleanup requires `CRON_SECRET`. Split headers are `X-Latr-Client-Id` and `X-Latr-API-Key`; `X-Latr-Official-Client` remains supported for internal callers. There is no registration endpoint or database key lookup. `LATR_GATEWAY_OFFICIAL_CLIENT_CREDENTIALS` holds `client-id=secret` pairs, separated by commas or semicolons. A `|`-separated credential list supports overlapping rotation; `sha256:<hex>` entries retain existing internal hashes. Invalid entries, duplicate IDs, empty rotation values and invalid hashes fail startup. Configure matching credentials only on calling servers; never put them in browser bootstrap or distributed clients.
 
-The browser and native apps use the same-origin `/api/latr-gateway/*` proxy. It injects server credentials and signs the public method/URL with `LATR_GATEWAY_PROXY_SECRET`; Go validates that HMAC before using the public URL for DPoP binding across Vercel's internal hop. Never expose official credentials or the proxy key as `NEXT_PUBLIC_*`.
+The web app uses its same-origin `/api/latr-gateway/*` proxy. Native clients and store extension builds call the hosted proxy without embedding its internal credential. It injects server credentials and signs the public method/URL with `LATR_GATEWAY_PROXY_SECRET`; Go validates that HMAC before using the public URL for DPoP binding across Vercel's internal hop. Never expose official credentials or the proxy key as `NEXT_PUBLIC_*`.
 
 The verifier binds the access token issuer to the viewer's DID-discovered PDS authorization servers, checks token expiry/signature/key binding and request method/URL/token hash, and claims each proof atomically in Turso. Unsupported public token verification falls back to PDS authority checks; enrichment/auth probes attest the PDS session. Every authenticated upstream call consumes its own correctly targeted client-minted proof.
 
@@ -37,7 +37,7 @@ All operational methods use `/xrpc/`:
 | PATCH | `link.latr.bookmarks.setState` |
 | GET | `link.latr.preview.getOpenGraph`, `link.latr.discovery.resolveUrl`, `link.latr.auth.probe` |
 
-Bookmark NSIDs without a full prefix in the table use `link.latr.bookmarks.`. Legacy `/v1/latr/*`, `link.latr.saved.*` and `link.latr.developer.*` return 410 and have no operation handlers. The old Next.js `/api/og-preview` and `/api/at-uri-from-url` fetch endpoints are removed.
+Bookmark NSIDs without a full prefix in the table use `link.latr.bookmarks.`. The hosted `setState` route currently requires PATCH, while the canonical native client method describes POST; native transport retains an explicit PATCH override. Preserve this compatibility until the contract and gateway change together. Legacy `/v1/latr/*`, `link.latr.saved.*` and `link.latr.developer.*` return 410 and have no operation handlers. The old Next.js `/api/og-preview` and `/api/at-uri-from-url` fetch endpoints are removed.
 
 Input validation is generated from the pinned canonical `latr-packages` dependency by `scripts/generate-go-contracts.py`; do not copy lexicon JSON into this repository. Query/property/verb/size checks and private no-store responses are enforced at the gateway. Migration proof pools can use the `upstreamDpopProof` JSON transport field to avoid proxy header limits.
 

@@ -4,4 +4,6 @@ The LatrKit developer console and public client/API-key registration service are
 
 L@tr.link bookmarks remain on the signed-in user’s PDS. The application uses the bookmark XRPC service with viewer OAuth/DPoP and server-configured official credentials; it does not issue developer API keys.
 
-Existing developer credentials are no longer accepted by the migrated backend. Retiring the source does not shut down a hosted Railway service: remove its domains and stop the service during the verified hosting cutover.
+Provisioned developer credentials are no longer resolved from a database. Selected existing first-party credentials remain accepted only through internal environment configuration, including retained hashes for rotation. No developer account or key issuance API is deployed.
+
+The completed Vercel cutover redirected `latrkit.dev` and `testing.latrkit.dev` to `latr.link` and stopped the former Railway console services. Retained Railway configuration, volumes and backups are historical rollback resources. See [cutover evidence](../deployment/vercel-migration.md).
