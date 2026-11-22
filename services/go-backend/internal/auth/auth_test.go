@@ -1,0 +1,132 @@
+package auth
+
+import (
+	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+)
+
+func jwt(t *testing.T, k *ecdsa.PrivateKey, h, c any) string {
+	t.Helper()
+	hb, _ := json.Marshal(h)
+	cb, _ := json.Marshal(c)
+	input := base64.RawURLEncoding.EncodeToString(hb) + "." + base64.RawURLEncoding.EncodeToString(cb)
+	hash := sha256.Sum256([]byte(input))
+	r, s, e := ecdsa.Sign(rand.Reader, k, hash[:])
+	if e != nil {
+		t.Fatal(e)
+	}
+	sig := make([]byte, 64)
+	r.FillBytes(sig[:32])
+	s.FillBytes(sig[32:])
+	return input + "." + base64.RawURLEncoding.EncodeToString(sig)
+}
+
+type transport func(*http.Request) (*http.Response, error)
+
+func (f transport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+type replay struct{ seen map[string]bool }
+
+func (r *replay) Claim(_ context.Context, k string, _ time.Time) error {
+	if r.seen[k] {
+		return unauthorized("replay", "replay")
+	}
+	r.seen[k] = true
+	return nil
+}
+func TestAuthenticateSignatureReplayAndBinding(t *testing.T) {
+	k, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	enc := func(b []byte) string { return base64.RawURLEncoding.EncodeToString(b) }
+	j := jwk{Kty: "EC", Crv: "P-256", X: enc(k.X.FillBytes(make([]byte, 32))), Y: enc(k.Y.FillBytes(make([]byte, 32)))}
+	now := time.Now()
+	issuedAt := now.Unix()
+	token := jwt(t, k, map[string]any{"alg": "ES256"}, map[string]any{"sub": "did:plc:test", "iss": "https://issuer.test", "exp": now.Unix() + 600, "cnf": map[string]string{"jkt": thumbprint(j)}})
+	hash := sha256.Sum256([]byte(token))
+	makeProof := func(htu string) string {
+		return jwt(t, k, map[string]any{"alg": "ES256", "typ": "dpop+jwt", "jwk": j}, map[string]any{"htm": "GET", "htu": htu, "iat": issuedAt, "jti": "unique", "ath": enc(hash[:])})
+	}
+	allowedIssuer := "https://issuer.test"
+	client := &http.Client{Transport: transport(func(r *http.Request) (*http.Response, error) {
+		var body string
+		switch r.URL.Path {
+		case "/.well-known/oauth-authorization-server":
+			body = `{"issuer":"https://issuer.test","jwks_uri":"https://issuer.test/keys"}`
+		case "/.well-known/oauth-protected-resource":
+			body = `{"resource":"https://pds.test","authorization_servers":["` + allowedIssuer + `"]}`
+		case "/keys":
+			b, _ := json.Marshal(map[string]any{"keys": []jwk{j}})
+			body = string(b)
+		default:
+			body = `{"id":"did:plc:test","service":[{"id":"#other","serviceEndpoint":{"uri":"https://other.test"}},{"id":"#atproto_pds","serviceEndpoint":"https://pds.test"}]}`
+		}
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(body))}, nil
+	})}
+	a := Authenticator{HTTPClient: client, Replay: &replay{map[string]bool{}}, Now: func() time.Time { return now }}
+	r := httptest.NewRequest("GET", "https://gateway.test/xrpc/list", nil)
+	r.Header.Set("Authorization", "DPoP "+token)
+	r.Header.Set("DPoP", makeProof("https://gateway.test/xrpc/list"))
+	got, e := a.Authenticate(r, false)
+	if e != nil || got.DID != "did:plc:test" || !got.SignatureVerified || got.PDSEndpoint != "https://pds.test" {
+		t.Fatalf("auth: %+v %v", got, e)
+	}
+	if _, e = a.Authenticate(r, false); e == nil {
+		t.Fatal("replay accepted")
+	}
+	allowedIssuer = "https://legitimate-other-issuer.test"
+	a.Replay = &replay{map[string]bool{}}
+	if _, e = a.Authenticate(r, false); e == nil {
+		t.Fatal("issuer not authorized by PDS accepted")
+	}
+	allowedIssuer = "https://issuer.test"
+	issuedAt = now.Unix() - 300
+	a.Replay = replayFunc(func(_ context.Context, _ string, expires time.Time) error {
+		if expires.Unix() <= now.Unix() {
+			t.Fatal("accepted proof expires immediately")
+		}
+		return nil
+	})
+	r.Header.Set("DPoP", makeProof("https://gateway.test/xrpc/list"))
+	if _, e = a.Authenticate(r, false); e != nil {
+		t.Fatal(e)
+	}
+	r.Header.Set("DPoP", makeProof("https://other.test/xrpc/list"))
+	if _, e = a.Authenticate(r, false); e == nil {
+		t.Fatal("wrong URL accepted")
+	}
+}
+func TestProofPoolConsumesMatchingProofOnlyOnce(t *testing.T) {
+	raw := func(verb, path string) string {
+		b, _ := json.Marshal(map[string]string{"htm": verb, "htu": path})
+		return "h." + base64.RawURLEncoding.EncodeToString(b) + ".s"
+	}
+	one := raw("GET", "https://pds.test/xrpc/list?cursor=a")
+	two := raw("POST", "https://pds.test/xrpc/write")
+	p := NewProofPool(one + "," + two)
+	if _, ok := p.Consume("write", "GET", "https://pds.test"); ok {
+		t.Fatal("wrong method matched")
+	}
+	if got, ok := p.Consume("list", "GET", "https://pds.test"); !ok || got != one {
+		t.Fatal("matching failed")
+	}
+	if _, ok := p.Consume("list", "GET", "https://pds.test"); ok {
+		t.Fatal("proof reused")
+	}
+	if _, ok := p.Consume("write", "POST", "https://pds.test"); !ok {
+		t.Fatal("other proof lost")
+	}
+}
+
+type replayFunc func(context.Context, string, time.Time) error
+
+func (f replayFunc) Claim(c context.Context, k string, e time.Time) error { return f(c, k, e) }
