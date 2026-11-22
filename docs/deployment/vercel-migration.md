@@ -112,3 +112,13 @@ Webpack; the default Turbopack build is blocked by local worker-port permissions
 Chrome automation could not acquire its already-running profile, so no browser
 acceptance is claimed for this cleanup. Independent diff review found no
 regressions. No native app source changed as part of this task.
+
+## Swift app-only cleanup (2026-11-22)
+
+All maintained Swift source now lives under `apps/apple`, including the app-icon
+exporter moved to `apps/apple/tools/export-apple-mark.swift`. Native app, core,
+share extension, tests and remote LatrKit dependencies remain. Removed the
+ignored retired gateway `.build` directory (about 2.2 GB of old dependency
+checkouts/build outputs); retained its `data` backups. Updated architecture
+and contract ownership docs to describe the current Go backend. Linear tools
+remain unavailable; this records the follow-up work on the same feature branch.
