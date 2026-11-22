@@ -105,6 +105,7 @@ export default function LoginPage() {
               <div className="mb-4 flex justify-center">
                 <Image
                   src={BRAND_ICON_PATH}
+                  unoptimized
                   alt=""
                   width={56}
                   height={56}

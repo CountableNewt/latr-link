@@ -4,7 +4,9 @@ const nextConfig: NextConfig = {
   transpilePackages: ["latr-packages", "latr-web-client"],
   env: {
     NEXT_PUBLIC_APP_ENV:
-      process.env.NEXT_PUBLIC_APP_ENV ?? process.env.APP_ENV ?? "",
+      process.env.NEXT_PUBLIC_APP_ENV?.trim() || process.env.APP_ENV?.trim() ||
+      (process.env.VERCEL_ENV === "production" ? "prod" :
+        process.env.VERCEL_ENV === "preview" ? "dev" : ""),
   },
   allowedDevOrigins: ["127.0.0.1"],
   async rewrites() {

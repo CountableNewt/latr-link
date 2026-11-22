@@ -1,28 +1,7 @@
-# LatrKit developer console (`latrkit.dev`)
+# Retired developer console
 
-The developer portal lives at **`apps/latrkit-dev`** in this monorepo. The former
-standalone repository is retained as migration history but is no longer the
-deployment source.
+The LatrKit developer console and public client/API-key registration service are retired. The `apps/latrkit-dev` application has been removed from this repository and its build pipeline.
 
-Sign in with ATProto OAuth, register gateway clients, issue split-header API keys (`X-Latr-Client-Id` + `X-Latr-API-Key`), and review usage counters. The Swift gateway in this monorepo (`services/latr-gateway`) implements the management APIs.
+L@tr.link bookmarks remain on the signed-in user’s PDS. The application uses the bookmark XRPC service with viewer OAuth/DPoP and server-configured official credentials; it does not issue developer API keys.
 
-## Local development
-
-```bash
-# Gateway (this monorepo)
-cd services/latr-gateway && swift run LatrGateway
-
-# Console (this monorepo)
-cd apps/latrkit-dev && bun run dev   # http://127.0.0.1:3001
-```
-
-## Gateway configuration
-
-| Variable | Description |
-|----------|-------------|
-| `LATR_GATEWAY_DEVELOPER_STORE_PATH` | JSON persistence for clients/keys/usage |
-| `LATR_GATEWAY_SQLITE_PATH` | Gateway SQLite file on its persistent volume; schema initialized at startup |
-
-See [`docs/architecture/latr-gateway.md`](../architecture/latr-gateway.md), the
-[Railway runbook](../deployment/railway.md), and
-[`apps/latrkit-dev/README.md`](../../apps/latrkit-dev/README.md).
+Existing developer credentials are no longer accepted by the migrated backend. Retiring the source does not shut down a hosted Railway service: remove its domains and stop the service during the verified hosting cutover.

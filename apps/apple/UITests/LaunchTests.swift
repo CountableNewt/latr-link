@@ -75,40 +75,59 @@ final class LaunchTests: XCTestCase {
         dismissSafariTipIfPresent(safari)
         let directShare = safari.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@", "ShareButton", "Share")).firstMatch
         let menu = safari.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@", "MoreMenuButton", "More")).firstMatch
-        if !waitUntilHittable(directShare, timeout: 3) {
-            if !menu.exists || !menu.isHittable {
+        if !waitUntilSafariActionable(directShare, in: safari, timeout: 3) {
+            if !waitUntilSafariActionable(menu, in: safari, timeout: 5) {
                 // Navigation can leave Safari's toolbar minimized, removing both
                 // actions from accessibility. Scroll toward the top to reveal it.
                 let page = safari.webViews.firstMatch
                 XCTAssertTrue(page.waitForExistence(timeout: 10), safari.debugDescription)
                 for _ in 0..<2 {
                     page.swipeDown()
-                    if waitUntilHittable(directShare, timeout: 2) || waitUntilHittable(menu, timeout: 2) { break }
+                    if waitUntilSafariActionable(directShare, in: safari, timeout: 2) || waitUntilSafariActionable(menu, in: safari, timeout: 2) { break }
                 }
             }
         }
-        if !directShare.exists || !directShare.isHittable {
+        if !waitUntilSafariActionable(directShare, in: safari, timeout: 2) {
             // Safari's compact toolbar exposes Share inside More. Page Menu is
             // a separate formatting control and does not contain the share action.
-            guard tapVisibleCenter(menu, in: safari, timeout: 5, name: "Safari More toolbar control") else { return }
+            guard tapVisibleCenter(menu, in: safari, timeout: 15, name: "Safari More toolbar control", dismissSafariGuidance: true) else { return }
             // First-use guidance can consume the initial More tap rather than
             // opening its menu. Dismiss it, then make the intended tap once more.
             if dismissSafariTipIfPresent(safari) {
-                guard tapVisibleCenter(menu, in: safari, timeout: 5, name: "Safari More after guidance") else { return }
+                guard tapVisibleCenter(menu, in: safari, timeout: 15, name: "Safari More after guidance", dismissSafariGuidance: true) else { return }
             }
         }
         // Safari exposes the button while a page is loading but keeps it
         // disabled. A tap at that point is ignored and no share sheet opens.
-        XCTAssertTrue(waitUntilActionable(directShare, timeout: 30), safari.debugDescription)
+        guard waitUntilSafariActionable(directShare, in: safari, timeout: 30) else {
+            XCTFail("Safari Share control did not become actionable. \(safari.debugDescription)")
+            return
+        }
         directShare.tap()
         let extensionButton = safari.descendants(matching: .any).matching(NSPredicate(format: "label == %@ OR label == %@", "L@tr.link", "Save to L@tr.link")).firstMatch
-        if !extensionButton.waitForExistence(timeout: 4) {
-            let activities = safari.collectionViews["activityCollectionView"]
-            XCTAssertTrue(activities.waitForExistence(timeout: 10), safari.debugDescription)
-            let more = safari.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "More")).firstMatch
-            if !more.exists || !more.isHittable { activities.swipeLeft() }
-            XCTAssertTrue(waitUntilHittable(more, timeout: 5), safari.debugDescription)
-            more.tap()
+        let shareSheet = safari.otherElements["ActivityListView"].firstMatch
+        let activities = safari.collectionViews["activityCollectionView"]
+        // A cold simulator can expose the remote sheet shell before its activity
+        // contents. Wait for contents, and do not confuse Safari's toolbar More
+        // button underneath the sheet with the share sheet's activity picker.
+        let sheetMore = shareSheet.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "More")).firstMatch
+        let contents = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            extensionButton.exists || activities.exists || sheetMore.exists
+        }, object: nil)
+        guard XCTWaiter.wait(for: [contents], timeout: 30) == .completed else {
+            capture(safari, name: "Safari share sheet missing activity contents")
+            XCTFail("Safari share sheet did not expose activity contents. \(safari.debugDescription)")
+            return
+        }
+        if !extensionButton.exists {
+            if !sheetMore.exists || !sheetMore.isHittable {
+                if activities.exists { activities.swipeLeft() } else { shareSheet.swipeLeft() }
+            }
+            guard waitUntilHittable(sheetMore, timeout: 10) else {
+                XCTFail("Safari share sheet More activity was not hittable. \(safari.debugDescription)")
+                return
+            }
+            sheetMore.tap()
         }
         XCTAssertTrue(extensionButton.waitForExistence(timeout: 10), safari.debugDescription)
         guard tapVisibleCenter(extensionButton, in: safari, timeout: 10, name: "L@tr.link share activity") else { return }
@@ -135,8 +154,11 @@ final class LaunchTests: XCTestCase {
         return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
     }
 
-    @MainActor private func tapVisibleCenter(_ element: XCUIElement, in app: XCUIApplication, timeout: TimeInterval, name: String, file: StaticString = #filePath, line: UInt = #line) -> Bool {
-        guard waitUntilHittable(element, timeout: timeout) else {
+    @MainActor private func tapVisibleCenter(_ element: XCUIElement, in app: XCUIApplication, timeout: TimeInterval, name: String, dismissSafariGuidance: Bool = false, file: StaticString = #filePath, line: UInt = #line) -> Bool {
+        let actionable = dismissSafariGuidance
+            ? waitUntilSafariActionable(element, in: app, timeout: timeout)
+            : waitUntilHittable(element, timeout: timeout)
+        guard actionable else {
             XCTFail("\(name) is not hittable. \(app.debugDescription)", file: file, line: line)
             return false
         }
@@ -164,10 +186,24 @@ final class LaunchTests: XCTestCase {
         return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
     }
 
+    @MainActor private func waitUntilSafariActionable(_ element: XCUIElement, in safari: XCUIApplication, timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            // First-use guidance can arrive after navigation's initial check.
+            // Handle it while waiting, before querying or tapping the toolbar.
+            dismissSafariTipIfPresent(safari, timeout: 0)
+            if element.exists && element.isHittable && element.isEnabled {
+                if !safari.otherElements["TipView"].exists { return true }
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        } while Date() < deadline
+        return false
+    }
+
     @discardableResult
-    @MainActor private func dismissSafariTipIfPresent(_ safari: XCUIApplication) -> Bool {
+    @MainActor private func dismissSafariTipIfPresent(_ safari: XCUIApplication, timeout: TimeInterval = 2) -> Bool {
         let tip = safari.otherElements["TipView"]
-        guard tip.waitForExistence(timeout: 2) else { return false }
+        guard tip.waitForExistence(timeout: timeout) else { return false }
         let close = tip.buttons["Close"].firstMatch
         guard tapVisibleCenter(close, in: safari, timeout: 2, name: "Safari guidance close") else { return false }
         let dismissed = tip.waitForNonExistence(timeout: 3)

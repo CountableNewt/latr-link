@@ -1,11 +1,11 @@
-# L@tr (latr.link)
+# L@tr.link
 
-Read-later on your own ATProto repo. Saved state lives in `link.latr.saved.item` and `link.latr.saved.external` — no Stygian backend required for core functionality.
+ATProto read-later with bookmarks and reading state on your own PDS. Next.js and two Go services deploy together on Vercel; Turso holds derived previews and shared replay protection. Public developer registration is retired.
 
 ```
-Next.js (latr.link)  ── ATProto OAuth ──►  Your PDS
-                         XRPC            link.latr.saved.item
-                                         link.latr.saved.external
+Next.js → same-origin proxy → Go bookmark/metadata services → your PDS
+                                      ↓
+                                Turso operational state
 ```
 
 ## Monorepo layout
@@ -15,11 +15,11 @@ latr-link/
   apps/
     apple/         # SwiftUI iPhone/iPad app and Share Extension
     web/           # Next.js web client (Bun)
-    latrkit-dev/   # LatrKit developer console (Bun)
+    extension/     # Chromium/Firefox browser extension
   packages/
     latr-web-client/  # shared save/gateway client (Bun)
   services/
-    latr-gateway/     # Swift/Hummingbird gateway (LatrKit via GitHub SwiftPM)
+    go-backend/       # Go bookmark and metadata services
   docs/
     architecture/
 ```
@@ -28,7 +28,8 @@ latr-link/
 
 | Tool | Version |
 |------|---------|
-| [Bun](https://bun.sh) | ≥ 1.2 |
+| [Bun](https://bun.sh) | 1.3.14 |
+| [Go](https://go.dev) | as pinned in `services/go-backend/go.mod` |
 
 ## Quick start
 
@@ -45,7 +46,7 @@ With `next dev` **or** `next start`, opening **`http://127.0.0.1:3000`** or **`h
 
 Loopback OAuth must use a `client_id` that includes your `/callback` path and repo scopes. `apps/web/.env.local` should set `NEXT_PUBLIC_APP_ENV=local` (already in `.env.example`).
 
-**Production:** set **`NEXT_PUBLIC_APP_ENV=prod`** on the host—if **`NEXT_PUBLIC_APP_ENV`** is unset at build/runtime, it defaults to **`local`**, which shows LOCAL-only UI on the live site. See **`apps/web/.env.example`** for **`prod`** / **`local`** / **`dev`** behavior.
+Vercel production builds default to `prod`, previews to `dev`. Other hosts must set `NEXT_PUBLIC_APP_ENV` explicitly. See **`apps/web/.env.example`** for **`prod`** / **`local`** / **`dev`** behavior.
 
 Prefer **`http://127.0.0.1:3000`** in the browser so the redirect URI matches ATProto loopback rules (see `@atproto/oauth-client-browser` README — the library may rewrite `localhost` to loopback IP).
 
@@ -90,8 +91,10 @@ generated and ignored; edit `apps/apple/project.yml` for persistent project chan
 See [docs/architecture/overview.md](docs/architecture/overview.md).
 
 Deployment and database cutover procedures live in
-[docs/deployment/railway.md](docs/deployment/railway.md).
+[docs/deployment/vercel-migration.md](docs/deployment/vercel-migration.md).
 
 ## Lexicons
 
-Canonical `link.latr.*` schemas live in **[Stygian-Tech/latr-packages](https://github.com/Stygian-Tech/latr-packages)** (`packages/lexicons/`). Legacy `com.latr.*` repo rows are migrated automatically by the gateway on list.
+Canonical `link.latr.*` schemas live in **[CountableNewt/latr-packages](https://github.com/CountableNewt/latr-packages)**. Current records use `community.lexicon.bookmarks.bookmark` and `link.latr.bookmarks.metadata`; legacy records are migrated through the current bookmark API.
+
+For Go development, configure `services/go-backend/.env.example` values in your shell, apply the Turso schema with `python3 scripts/turso-migrate.py`, and run `go run ./cmd/gateway` from that directory. Use `bash scripts/ci.sh` for Go and JavaScript checks.

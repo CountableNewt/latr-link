@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { NextResponse } from "next/server";
 import {
   DEFAULT_DEV_LATR_GATEWAY_URL,
@@ -70,7 +71,10 @@ function forwardedProto(req: Request): string {
 }
 
 function serverGatewayBaseUrl(req: Request): string {
-  const internal = process.env.LATR_GATEWAY_INTERNAL_URL?.trim();
+  const path = requestUrl(req).pathname.slice(LATR_GATEWAY_PROXY_BASE_PATH.length);
+  const metadata = path === "/xrpc/link.latr.preview.getOpenGraph" || path === "/xrpc/link.latr.discovery.resolveUrl";
+  const internal = (metadata ? process.env.LATR_METADATA_INTERNAL_URL : process.env.LATR_GATEWAY_INTERNAL_URL)?.trim()
+    || process.env.LATR_GATEWAY_INTERNAL_URL?.trim();
   if (internal) return internal.replace(/\/$/, "");
 
   const configured = process.env.NEXT_PUBLIC_LATR_GATEWAY_URL?.trim();
@@ -180,6 +184,13 @@ function forwardedRequestHeaders(req: Request): {
     `${LATR_GATEWAY_PROXY_BASE_PATH}${url.pathname.slice(LATR_GATEWAY_PROXY_BASE_PATH.length)}${url.search}`
   );
 
+  const proxySecret = process.env.LATR_GATEWAY_PROXY_SECRET?.trim();
+  if (proxySecret) {
+    const originalUrl = `${forwardedProto(req)}://${forwardedHost(req)}${url.pathname}${url.search}`;
+    headers.set("X-Latr-Proxy-URL", originalUrl);
+    headers.set("X-Latr-Proxy-Signature", createHmac("sha256", proxySecret).update(`${req.method}\n${originalUrl}`).digest("hex"));
+  }
+
   for (const [name, value] of gatewayCredentialHeaders()) {
     headers.set(name, value);
   }
@@ -201,6 +212,12 @@ function forwardedRequestHeaders(req: Request): {
 }
 
 async function proxyLatrGateway(req: Request): Promise<Response> {
+  if ((process.env.VERCEL_ENV === "preview" || process.env.VERCEL_ENV === "production") && !process.env.LATR_GATEWAY_INTERNAL_URL?.trim()) {
+    return NextResponse.json({ error: "gateway_binding_unconfigured" }, { status: 503 });
+  }
+  if (process.env.VERCEL_ENV && !process.env.LATR_GATEWAY_PROXY_SECRET?.trim()) {
+    return NextResponse.json({ error: "gateway_proxy_signature_unconfigured" }, { status: 503 });
+  }
   const url = requestUrl(req);
   const path = url.pathname.slice(LATR_GATEWAY_PROXY_BASE_PATH.length);
   const gatewayBase = serverGatewayBaseUrl(req);

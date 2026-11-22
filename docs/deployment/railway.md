@@ -1,3 +1,5 @@
+> Historical rollback runbook. The active deployment target is [Vercel Services](vercel-migration.md). Use the old source revision `009e734` when following historical Railway configuration paths; those runtime files are retired from current source.
+
 # Railway deployment and cutover
 
 Railway hosts L@tr.link in one project with isolated `dev` and `production`

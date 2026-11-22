@@ -1,9 +1,13 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { createHmac } from "node:crypto";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import { GET, POST } from "./route";
 
 const ORIGINAL_FETCH = globalThis.fetch;
 const ORIGINAL_ENV = {
+  LATR_GATEWAY_PROXY_SECRET: process.env.LATR_GATEWAY_PROXY_SECRET,
+  VERCEL_ENV: process.env.VERCEL_ENV,
+  LATR_METADATA_INTERNAL_URL: process.env.LATR_METADATA_INTERNAL_URL,
   APP_ENV: process.env.APP_ENV,
   NEXT_PUBLIC_APP_ENV: process.env.NEXT_PUBLIC_APP_ENV,
   LATR_GATEWAY_INTERNAL_URL: process.env.LATR_GATEWAY_INTERNAL_URL,
@@ -22,6 +26,8 @@ function restoreEnv(): void {
     }
   }
 }
+
+beforeEach(() => { process.env.LATR_GATEWAY_PROXY_SECRET = "proxy-test-secret"; });
 
 afterEach(() => {
   globalThis.fetch = ORIGINAL_FETCH;
@@ -105,6 +111,8 @@ describe("/api/latr-gateway proxy", () => {
 
     expect(res.status).toBe(200);
     expect(target).toBe("https://api.testing.latr.link/v1/latr/saves?limit=10");
+    expect(headers.get("X-Latr-Proxy-URL")).toBe(req.url);
+    expect(headers.get("X-Latr-Proxy-Signature")).toBe(createHmac("sha256", "proxy-test-secret").update(`GET\n${req.url}`).digest("hex"));
     expect(headers.get("Authorization")).toBe("DPoP access");
     expect(headers.get("DPoP")).toBe("gateway-proof");
     expect(headers.get("X-Latr-Forwarded-Authorization")).toBe("DPoP access");
@@ -126,14 +134,14 @@ describe("/api/latr-gateway proxy", () => {
 
     let target = "";
     let headers = new Headers();
-    globalThis.fetch = (async (url, init) => {
+    globalThis.fetch = (async (url: Parameters<typeof fetch>[0], init?: RequestInit) => {
       target = String(url);
       headers = new Headers(init?.headers);
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
-    }) as typeof fetch;
+    }) as unknown as typeof fetch;
 
     const req = new Request(
       "https://latr.link/api/latr-gateway/v1/latr/saves",
@@ -286,13 +294,13 @@ describe("/api/latr-gateway proxy", () => {
     delete process.env.LATR_GATEWAY_CLIENT_CREDENTIAL;
 
     let headers = new Headers();
-    globalThis.fetch = (async (_url, init) => {
+    globalThis.fetch = (async (_url: Parameters<typeof fetch>[0], init?: RequestInit) => {
       headers = new Headers(init?.headers);
       return new Response(JSON.stringify({ records: [] }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
-    }) as typeof fetch;
+    }) as unknown as typeof fetch;
 
     const req = new Request(
       "http://127.0.0.1:3000/api/latr-gateway/v1/latr/saves",
@@ -313,4 +321,34 @@ describe("/api/latr-gateway proxy", () => {
     expect(headers.get("X-Latr-API-Key")).toBeNull();
     expect(headers.get("X-Latr-Official-Client")).toBeNull();
   });
+});
+
+ test("Preview does not fall back to production when its binding is absent", async () => {
+  process.env.VERCEL_ENV = "preview";
+  delete process.env.LATR_GATEWAY_INTERNAL_URL;
+  process.env.NEXT_PUBLIC_LATR_GATEWAY_URL = "https://api.latr.link";
+  globalThis.fetch = (() => { throw new Error("must not contact production"); }) as unknown as typeof fetch;
+  const response = await GET(new Request("https://branch.vercel.app/api/latr-gateway/v1/latr/saves"));
+  expect(response.status).toBe(503);
+  expect(await response.json()).toEqual({ error: "gateway_binding_unconfigured" });
+});
+
+test("Production fails closed without a deployment binding", async () => {
+  process.env.VERCEL_ENV = "production";
+  delete process.env.LATR_GATEWAY_INTERNAL_URL;
+  const response = await GET(new Request("https://latr.link/api/latr-gateway/xrpc/link.latr.bookmarks.listBookmarks"));
+  expect(response.status).toBe(503);
+});
+test("Metadata uses its deployment-local binding", async () => {
+  process.env.VERCEL_ENV = "preview";
+  process.env.LATR_GATEWAY_INTERNAL_URL = "https://gateway.service";
+  process.env.LATR_METADATA_INTERNAL_URL = "https://metadata.service";
+  process.env.LATR_GATEWAY_CLIENT_ID = "latr-link-web";
+  process.env.LATR_GATEWAY_API_KEY = "server-key";
+  globalThis.fetch = (async (input: Parameters<typeof fetch>[0]) => {
+    expect(String(input)).toBe("https://metadata.service/xrpc/link.latr.preview.getOpenGraph?url=https%3A%2F%2Fexample.com");
+    return Response.json({ title: "Example" });
+  }) as unknown as typeof fetch;
+  const response = await GET(new Request("https://branch.vercel.app/api/latr-gateway/xrpc/link.latr.preview.getOpenGraph?url=https%3A%2F%2Fexample.com"));
+  expect(response.status).toBe(200);
 });

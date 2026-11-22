@@ -55,3 +55,10 @@ coverage/
 *.swiftdeps
 *.d
 *.dia
+.vercel
+.env*
+!.env.example
+.playwright-cli/
+**/__pycache__/
+/services/latr-gateway/
+/services/go-backend/data/

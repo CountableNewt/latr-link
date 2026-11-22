@@ -115,121 +115,6 @@ describe("latrGatewayFetch upstream proofs", () => {
     expect(isLatrGatewayConflictError(new Error("Conflict"))).toBe(false);
   });
 
-  test("XRPC listItems sends list-only upstream proofs", async () => {
-    let upstreamHeader = "";
-    globalThis.fetch = (async (_url, init) => {
-      upstreamHeader = String(
-        new Headers(init?.headers).get(LATR_UPSTREAM_DPOP_HEADER) ?? ""
-      );
-      return new Response(JSON.stringify({ records: [] }), { status: 200 });
-    }) as typeof fetch;
-    const oauth = mockOAuthSession(async () =>
-      new Response(JSON.stringify({ error: "Use DPoP nonce" }), {
-        status: 400,
-        headers: { "DPoP-Nonce": "fresh-pds-nonce" },
-      })
-    );
-
-    await latrGatewayFetch(
-      oauth,
-      `${latrXrpcPath(LATR_XRPC.listItems)}?limit=100`,
-      { method: "GET" }
-    );
-
-    expect(upstreamHeader.split(",")).toHaveLength(1);
-  });
-
-  test("XRPC setState sends getRecord and putRecord proof pool", async () => {
-    let upstreamHeader = "";
-    globalThis.fetch = (async (_url, init) => {
-      upstreamHeader = String(
-        new Headers(init?.headers).get(LATR_UPSTREAM_DPOP_HEADER) ?? ""
-      );
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
-    }) as typeof fetch;
-    const oauth = mockOAuthSession(async () =>
-      new Response(JSON.stringify({ error: "Use DPoP nonce" }), {
-        status: 400,
-        headers: { "DPoP-Nonce": "fresh-pds-nonce" },
-      })
-    );
-
-    await latrGatewayFetch(oauth, latrXrpcPath(LATR_XRPC.setState), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ itemRkey: "abc", state: "archived" }),
-    });
-
-    expect(upstreamHeader.split(",")).toHaveLength(4);
-  });
-
-  test("GET /v1/latr/saves sends list-only upstream proofs", async () => {
-    let upstreamHeader = "";
-
-    globalThis.fetch = (async (_url, init) => {
-      upstreamHeader = String(
-        new Headers(init?.headers).get(LATR_UPSTREAM_DPOP_HEADER) ?? ""
-      );
-      return new Response(JSON.stringify({ records: [] }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
-    }) as typeof fetch;
-
-    const oauth = mockOAuthSession(async () => {
-      return new Response(JSON.stringify({ error: "Use DPoP nonce" }), {
-        status: 400,
-        headers: { "DPoP-Nonce": "fresh-pds-nonce" },
-      });
-    });
-
-    await latrGatewayFetch(oauth, "/v1/latr/saves", { method: "GET" });
-
-    expect(upstreamHeader.split(",")).toHaveLength(8);
-  });
-
-  test("POST /v1/latr/migrate-lexicons sends migration upstream proofs", async () => {
-    let upstreamHeader = "";
-    let contentType = "";
-    let requestBody = "";
-
-    globalThis.fetch = (async (_url, init) => {
-      const headers = new Headers(init?.headers);
-      upstreamHeader = String(headers.get(LATR_UPSTREAM_DPOP_HEADER) ?? "");
-      contentType = String(headers.get("Content-Type") ?? "");
-      requestBody = String(init?.body ?? "");
-      return new Response(
-        JSON.stringify({
-          ok: true,
-          externalCopied: 0,
-          itemsCopied: 0,
-          externalDeleted: 0,
-          itemsDeleted: 0,
-        }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-    }) as typeof fetch;
-
-    const oauth = mockOAuthSession(async () => {
-      return new Response(JSON.stringify({ error: "Use DPoP nonce" }), {
-        status: 400,
-        headers: { "DPoP-Nonce": "fresh-pds-nonce" },
-      });
-    });
-
-    await latrGatewayFetch(oauth, LATR_GATEWAY_MIGRATE_LEXICONS_PATH, {
-      method: "POST",
-    });
-
-    expect(upstreamHeader).toBe("");
-    expect(contentType).toBe("application/json");
-    const body = JSON.parse(requestBody) as { upstreamDpopProof: string };
-    expect(body.upstreamDpopProof.split(",")).toHaveLength(32);
-  });
-
   test("bookmark setState uses the published getRecord/applyWrites proof plan", async () => {
     let upstreamHeader = "";
     globalThis.fetch = (async (_url, init) => {
@@ -321,35 +206,6 @@ describe("latrGatewayFetch upstream proofs", () => {
     expect(body.upstreamDpopProof.split(",")).toHaveLength(90);
   });
 
-  test("POST /v1/latr/saves sends save upstream proofs", async () => {
-    let upstreamHeader = "";
-
-    globalThis.fetch = (async (_url, init) => {
-      upstreamHeader = String(
-        new Headers(init?.headers).get(LATR_UPSTREAM_DPOP_HEADER) ?? ""
-      );
-      return new Response(JSON.stringify({ ok: true, kind: "url" }), {
-        status: 201,
-        headers: { "Content-Type": "application/json" },
-      });
-    }) as typeof fetch;
-
-    const oauth = mockOAuthSession(async () => {
-      return new Response(JSON.stringify({ error: "Use DPoP nonce" }), {
-        status: 400,
-        headers: { "DPoP-Nonce": "fresh-pds-nonce" },
-      });
-    });
-
-    await latrGatewayFetch(oauth, "/v1/latr/saves", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind: "url", url: "https://example.com" }),
-    });
-
-    expect(upstreamHeader.split(",")).toHaveLength(8);
-  });
-
   test("sends explicit gateway Authorization and DPoP headers", async () => {
     let authorization = "";
     let dpop = "";
@@ -376,7 +232,7 @@ describe("latrGatewayFetch upstream proofs", () => {
       (claims) => claimsSeen.push(claims)
     );
 
-    await latrGatewayFetch(oauth, "/v1/latr/og-preview?url=https://example.com", {
+    await latrGatewayFetch(oauth, "/xrpc/link.latr.preview.getOpenGraph?url=https://example.com", {
       method: "GET",
     });
 
@@ -385,7 +241,7 @@ describe("latrGatewayFetch upstream proofs", () => {
     expect(upstreamDpop).toBe("proof-2");
     expect(claimsSeen[0]).toMatchObject({
       htm: "GET",
-      htu: "http://127.0.0.1:8080/v1/latr/og-preview",
+      htu: "http://127.0.0.1:8080/xrpc/link.latr.preview.getOpenGraph",
     });
     expect(claimsSeen[1]).toMatchObject({
       htm: "GET",
@@ -395,7 +251,7 @@ describe("latrGatewayFetch upstream proofs", () => {
     });
   });
 
-  test("GET /v1/latr/discover/at-uri sends a PDS session attestation proof", async () => {
+  test("GET /xrpc/link.latr.discovery.resolveUrl sends a PDS session attestation proof", async () => {
     let upstreamDpop = "";
     const claimsSeen: Record<string, string | number>[] = [];
 
@@ -419,7 +275,7 @@ describe("latrGatewayFetch upstream proofs", () => {
 
     await latrGatewayFetch(
       oauth,
-      "/v1/latr/discover/at-uri?uri=at%3A%2F%2Fdid%3Aplc%3Atest%2Fapp.bsky.feed.post%2Fabc",
+      "/xrpc/link.latr.discovery.resolveUrl?uri=at%3A%2F%2Fdid%3Aplc%3Atest%2Fapp.bsky.feed.post%2Fabc",
       { method: "GET" }
     );
 
@@ -474,7 +330,7 @@ describe("latrGatewayFetch upstream proofs", () => {
     });
 
     try {
-      await latrGatewayFetch(oauth, "/v1/latr/saves", { method: "GET" });
+      await latrGatewayFetch(oauth, "/xrpc/link.latr.bookmarks.listBookmarks", { method: "GET" });
     } finally {
       globalThis.window = previousWindow;
     }
@@ -516,7 +372,7 @@ describe("latrGatewayFetch upstream proofs", () => {
     );
 
     try {
-      await latrGatewayFetch(oauth, "/v1/latr/saves?limit=1", {
+      await latrGatewayFetch(oauth, "/xrpc/link.latr.bookmarks.listBookmarks?limit=1", {
         method: "GET",
       });
     } finally {
@@ -524,7 +380,7 @@ describe("latrGatewayFetch upstream proofs", () => {
     }
 
     expect(requestUrl).toBe(
-      "https://latr.link/api/latr-gateway/v1/latr/saves?limit=1"
+      "https://latr.link/api/latr-gateway/xrpc/link.latr.bookmarks.listBookmarks?limit=1"
     );
     expect(requestHeaders.get("Authorization")).toBeNull();
     expect(requestHeaders.get("DPoP")).toBeNull();
@@ -536,7 +392,14 @@ describe("latrGatewayFetch upstream proofs", () => {
     expect(requestHeaders.get(LATR_PROXY_USER_DPOP_HEADER)).toBe("proof-1");
     expect(claimsSeen[0]).toMatchObject({
       htm: "GET",
-      htu: "https://latr.link/api/latr-gateway/v1/latr/saves",
+      htu: "https://latr.link/api/latr-gateway/xrpc/link.latr.bookmarks.listBookmarks",
     });
   });
+  test("rejects retired REST and saved-item routes before minting proofs", async () => {
+    const oauth = mockOAuthSession(async () => { throw new Error("must not contact PDS"); });
+    for (const path of ["/v1/latr/saves", "/xrpc/link.latr.saved.listItems", "/xrpc/link.latr.developer.listClients"]) {
+      await expect(latrGatewayFetch(oauth, path)).rejects.toThrow("Unsupported L@tr gateway endpoint");
+    }
+  });
+
 });
