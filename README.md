@@ -37,6 +37,8 @@ cp services/go-backend/.env.example services/go-backend/.env.local
 Edit the backend env file with a development Turso database/token, an internal
 client secret (`LATR_GATEWAY_OFFICIAL_CLIENT_CREDENTIALS=latr-link-web=<secret>`),
 and a random `LATR_GATEWAY_PROXY_SECRET`. Use a database separate from production.
+Quote credential lists containing `;` or `|` when loading them through a shell,
+for example `LATR_GATEWAY_OFFICIAL_CLIENT_CREDENTIALS='web=old|new;other=secret'`.
 The Go process does not load env files automatically. Load it into your shell and
 apply the operational schema from the repository root:
 

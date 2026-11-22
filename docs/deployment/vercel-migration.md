@@ -34,7 +34,9 @@ supported header format. For rotation use `client-id=old-secret|new-secret`,
 update callers, then remove the old value. SHA-256 hashes of existing internal
 credentials remain supported. Empty/malformed configuration, duplicate client
 IDs, empty rotation values and invalid hashes fail startup without logging
-credential values. Preserve matching proxy secrets across both service hops.
+credential values. Quote multi-client/rotation values when sourcing a shell env
+file, for example `LATR_GATEWAY_OFFICIAL_CLIENT_CREDENTIALS='web=old|new;other=secret'`.
+Preserve matching proxy secrets across both service hops.
 
 ### Schema and preview-cache transfer
 
@@ -198,3 +200,15 @@ ignored retired gateway `.build` directory (about 2.2 GB of old dependency
 checkouts/build outputs); retained its `data` backups. Updated architecture
 and contract ownership docs to describe the current Go backend. Linear tools
 remain unavailable; this records the follow-up work on the same feature branch.
+
+## Documentation audit (November 22, 2026)
+
+Reviewed all 23 tracked Markdown documents against current manifests, service
+routing, env templates, Go handlers and native targets. Updated local setup,
+internal auth, deployment/recovery boundaries, bookmark migration and client
+build guidance; corrected unsupported platform claims. All 32 local Markdown
+link targets resolve, Go generated-contract parity and native contract parity
+pass, and the migration CLI flags match the operating guide. No live database,
+DNS or provider state was changed or reverified during this documentation pass.
+Linear/MyContextProtocol tools remain unavailable; this audit records progress
+pending issue access. Existing user-owned Apple source edits remain excluded.
