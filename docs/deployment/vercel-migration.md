@@ -1,6 +1,6 @@
 # Go and Vercel migration
 
-Status: implementation in progress; Railway remains authoritative until cutover checks pass.
+Status as of 2026-11-22 19:47 UTC: testing web/API are on Vercel; production remains on Railway pending native CI setup fixes.
 
 ## Decisions
 
@@ -17,9 +17,9 @@ Status: implementation in progress; Railway remains authoritative until cutover 
 - [x] Remove public registration and retire developer console from deployment/build.
 - [x] Make browser API calls deployment-local and verify OAuth metadata is publicly fetchable through a branch-domain protection exception. Other preview domains remain protected.
 - [x] Configure Services routing, server-only credentials, production and branch preview isolation.
-- [x] Run Go race/vet/build, JavaScript tests/lint/typecheck/build and Chrome public-page validation. Signed-in save/list/tags/archive/unarchive passed, including a successful tag edit after ten idle minutes; removal awaits test-data cleanup approval.
+- [x] Run Go race/vet/build, JavaScript tests/lint/typecheck/build and Chrome public-page validation. Signed-in save/list/tags/archive/unarchive passed, including a successful tag edit after ten idle minutes; approved test-record removal passed and remained removed after reload.
 - [x] Rehearse SQLite cache transfer (11 tests); copy and verify nine unexpired cache rows to separate Turso databases. No developer registry or third-party keys transferred. Five active hashes for the three existing first-party clients are retained only in internal secret configuration.
-- [ ] Deploy preview and verify signed-in save/list/archive/delete/tags and external clients.
+- [x] Deploy preview and verify signed-in save/list/archive/unarchive/delete/tags. Removal returned 200 through Next.js and Go and remained removed after reload. Native/extension OAuth metadata and contract checks passed; separate signed-in native/Social Wire sessions were not exercised.
 - [ ] Back up Railway SQLite, migrate production cache, switch domains and verify production.
 - [ ] Stop Railway compute only after successful cutover; retain backups and volumes for rollback.
 
@@ -56,3 +56,10 @@ Sources: https://vercel.com/docs/services, https://vercel.com/docs/services/bind
 - A companion Social Wire cleanup is prepared at `/private/tmp/social-wire-latr-bookmarks`, branch `codex/latr-bookmark-client`, commit `c5a3b9f1` (96 focused tests/typecheck/lint). Active web/native bookmark flows were already canonical; this removes remaining old helper/backfill paths.
 
 - Vercel ingress socket timeouts are disabled for the serverless runtime while application deadlines remain bounded. After ten idle minutes the hosted `setTags` request returned 200 through both Next.js and Go, with no retry. Standalone HTTP server timeouts remain configured.
+
+## Cutover observations
+
+- Testing web/API DNS changed to Vercel branch aliases. Both public OAuth metadata and TLS pass; Chrome desktop/mobile login/landing checks passed with loaded logos, no overflow and no console errors. Targeted protection exceptions cover the stable branch alias and the two testing aliases only.
+- Production app/API/www and retired console TLS certificates were issued using Marque TXT validation before changing their live addresses. Existing MX, identity/lexicon TXT records, nameservers and DNSSEC were preserved.
+- The production API TTL was reduced from 3600 to 60 seconds at approximately 19:17 UTC. Retain its old Railway gateway until at least 20:18 UTC to cover the earlier cache window. Testing web/API changed at approximately 19:13 UTC with prior TTL 3600; retain their old routes through 20:14 UTC.
+- Native CI on `6c6411e` initially failed before invoking our extension: the simulator share-sheet remote container was empty in `testSafariShareRetainsSignedOutDraft` (`LaunchTests.swift:107`). Core tests (33), Release build, and the other seven iPhone UI tests passed. The identical native source passed that share test in the preceding run. The single retry failed earlier in the same Safari setup because a late first-use TipView blocked the toolbar. This is outside the app/extension flow. Test-only commit `e4ed814` handles late guidance, waits for actual share-sheet contents and scopes its activity picker. Its simulator test build passed for arm64/x86_64; full runtime CI remains the release gate. Production remains held. User-owned Apple edits remain uncommitted and excluded.
