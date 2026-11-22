@@ -97,6 +97,7 @@ function ProductPreview() {
         <div className="flex min-w-0 items-center gap-2">
           <Image
             src={BRAND_ICON_PATH}
+            unoptimized
             alt=""
             width={28}
             height={28}

@@ -13,6 +13,8 @@ import pathlib
 import shlex
 import sqlite3
 import urllib.request
+import urllib.error
+import urllib.parse
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
@@ -28,9 +30,17 @@ def credentials(env_file=None):
             env[key] = parsed[0] if parsed else ""
     url, token = env.get("TURSO_DATABASE_URL", ""), env.get("TURSO_AUTH_TOKEN", "")
     url = url.replace("libsql://", "https://").replace("turso://", "https://")
-    if not url.startswith("https://") or not token:
+    parsed_url=urllib.parse.urlsplit(url)
+    if (parsed_url.scheme != "https" or not parsed_url.hostname or parsed_url.username is not None
+            or parsed_url.password is not None or parsed_url.query or parsed_url.fragment or not token):
         raise ValueError("TURSO_DATABASE_URL and TURSO_AUTH_TOKEN are required")
     return url.rstrip("/"), token
+
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    """An authenticated database call must never forward credentials to a redirect."""
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise urllib.error.HTTPError(req.full_url, code, "Database redirects are refused", headers, fp)
 
 
 def execute(url, token, statements):
@@ -40,8 +50,11 @@ def execute(url, token, statements):
     requests.append({"type": "close"})
     req = urllib.request.Request(url + "/v2/pipeline", data=json.dumps({"requests": requests}).encode(),
                                  headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=30) as response:
-        result = json.load(response)
+    try:
+        with urllib.request.build_opener(NoRedirect).open(req, timeout=30) as response:
+            result = json.load(response)
+    except (urllib.error.URLError, json.JSONDecodeError):
+        raise RuntimeError("Turso migration request failed; credentials and remote error bodies withheld") from None
     if len(result.get("results", [])) != len(requests) or any(row["type"] != "ok" for row in result["results"]):
         raise RuntimeError("Turso migration statement failed; credentials and remote error bodies withheld")
     return result
@@ -77,7 +90,7 @@ def main():
     sql = """INSERT INTO bookmark_previews(subject_hash,subject,title,description,image_url,site_name,author,updated_at,expires_at)
         VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(subject_hash) DO UPDATE SET subject=excluded.subject,title=excluded.title,
         description=excluded.description,image_url=excluded.image_url,site_name=excluded.site_name,author=excluded.author,
-        updated_at=excluded.updated_at,expires_at=excluded.expires_at WHERE excluded.updated_at>bookmark_previews.updated_at"""
+        updated_at=excluded.updated_at,expires_at=excluded.expires_at WHERE julianday(excluded.updated_at)>julianday(bookmark_previews.updated_at)"""
     for start in range(0, len(rows), 50):
         execute(url, token, [("BEGIN IMMEDIATE", [])] + [(sql, row) for row in rows[start:start+50]] + [("COMMIT", [])])
     # Verify imported hashes individually, including reruns that preserve newer cache entries.

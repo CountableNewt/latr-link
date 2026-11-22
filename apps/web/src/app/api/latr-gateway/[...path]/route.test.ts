@@ -1,9 +1,11 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { createHmac } from "node:crypto";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import { GET, POST } from "./route";
 
 const ORIGINAL_FETCH = globalThis.fetch;
 const ORIGINAL_ENV = {
+  LATR_GATEWAY_PROXY_SECRET: process.env.LATR_GATEWAY_PROXY_SECRET,
   VERCEL_ENV: process.env.VERCEL_ENV,
   LATR_METADATA_INTERNAL_URL: process.env.LATR_METADATA_INTERNAL_URL,
   APP_ENV: process.env.APP_ENV,
@@ -24,6 +26,8 @@ function restoreEnv(): void {
     }
   }
 }
+
+beforeEach(() => { process.env.LATR_GATEWAY_PROXY_SECRET = "proxy-test-secret"; });
 
 afterEach(() => {
   globalThis.fetch = ORIGINAL_FETCH;
@@ -107,6 +111,8 @@ describe("/api/latr-gateway proxy", () => {
 
     expect(res.status).toBe(200);
     expect(target).toBe("https://api.testing.latr.link/v1/latr/saves?limit=10");
+    expect(headers.get("X-Latr-Proxy-URL")).toBe(req.url);
+    expect(headers.get("X-Latr-Proxy-Signature")).toBe(createHmac("sha256", "proxy-test-secret").update(`GET\n${req.url}`).digest("hex"));
     expect(headers.get("Authorization")).toBe("DPoP access");
     expect(headers.get("DPoP")).toBe("gateway-proof");
     expect(headers.get("X-Latr-Forwarded-Authorization")).toBe("DPoP access");

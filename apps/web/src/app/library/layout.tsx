@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import { LibraryChrome } from "./LibraryChrome";
 
@@ -14,5 +15,9 @@ export default function LibraryLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <LibraryChrome>{children}</LibraryChrome>;
+  return (
+    <Suspense fallback={<p role="status" className="p-6 text-sm text-muted-foreground">Loading library…</p>}>
+      <LibraryChrome>{children}</LibraryChrome>
+    </Suspense>
+  );
 }

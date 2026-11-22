@@ -13,3 +13,5 @@ services/latr-gateway
 **/*.sqlite*
 **/*.db
 **/coverage
+.playwright-cli
+**/__pycache__

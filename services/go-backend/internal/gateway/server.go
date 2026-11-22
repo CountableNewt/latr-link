@@ -46,7 +46,7 @@ func FromEnvironment(kind string) (*Server, error) {
 	if len(clients) == 0 {
 		return nil, errors.New("LATR_GATEWAY_OFFICIAL_CLIENT_CREDENTIALS must contain internal client credentials")
 	}
-	return &Server{Auth: &auth.Authenticator{HTTPClient: client, Replay: store, Clients: clients}, State: store, HTTP: client, Metadata: metadata.New(client), Kind: kind, CronSecret: os.Getenv("CRON_SECRET")}, nil
+	return &Server{Auth: &auth.Authenticator{HTTPClient: client, Replay: store, Clients: clients, ProxyKey: os.Getenv("LATR_GATEWAY_PROXY_SECRET")}, State: store, HTTP: client, Metadata: metadata.New(client), Kind: kind, CronSecret: os.Getenv("CRON_SECRET")}, nil
 }
 
 func jsonResponse(w http.ResponseWriter, status int, v any) {
@@ -121,7 +121,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if strings.HasPrefix(path, "/v1/latr/") || strings.HasPrefix(path, "/xrpc/link.latr.saved.") || strings.HasPrefix(path, "/xrpc/link.latr.developer.") || path == "/oauth/latrkit-client-metadata.json" {
-		respondError(w, r, httpx.NewError(410, "retired", "Public developer registration has been retired"))
+		respondError(w, r, httpx.NewError(410, "retired", "This API has been retired; use the current bookmark APIs"))
 		return
 	}
 	if strings.HasPrefix(path, "/oauth/") {
@@ -155,6 +155,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if proof := str(in, "upstreamDpopProof"); proof != "" && r.Header.Get("X-ATProto-Upstream-DPoP") == "" {
 			r.Header.Set("X-ATProto-Upstream-DPoP", proof)
 		}
+	}
+	if !strings.HasPrefix(path, "/xrpc/") {
+		respondError(w, r, httpx.NewError(404, "not_found", "Not found"))
+		return
 	}
 	if s.Auth == nil {
 		respondError(w, r, httpx.NewError(503, "auth_unavailable", "Authentication unavailable"))

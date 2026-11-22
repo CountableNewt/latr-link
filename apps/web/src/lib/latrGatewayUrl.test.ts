@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { configureLatrGateway } from "latr-web-client/latrGatewayConfig";
 
 import {
+  buildGatewayWindowBootstrap,
   LATR_GATEWAY_PROXY_BASE_PATH,
   DEFAULT_DEV_LATR_GATEWAY_URL,
   DEFAULT_PROD_LATR_GATEWAY_URL,
@@ -71,4 +72,21 @@ describe("Latr Gateway Base URL", () => {
       `https://testing.latr.link${LATR_GATEWAY_PROXY_BASE_PATH}`
     );
   });
+});
+
+test("Static gateway bootstrap contains only public deployment config", () => {
+  const keys = ["LATR_GATEWAY_CLIENT_CREDENTIAL", "LATR_GATEWAY_CLIENT_ID", "LATR_GATEWAY_API_KEY", "LATR_GATEWAY_INTERNAL_URL", "LATR_METADATA_INTERNAL_URL"];
+  const original = keys.map((key) => process.env[key]);
+  try {
+    for (const key of keys) process.env[key] = `private-${key}`;
+    process.env.NEXT_PUBLIC_LATR_GATEWAY_URL = "https://public.example";
+    const bootstrap = buildGatewayWindowBootstrap("prod");
+    expect(bootstrap).toEqual({ gatewayUrl: "https://public.example", appEnv: "prod" });
+    expect(JSON.stringify(bootstrap)).not.toContain("private-");
+  } finally {
+    keys.forEach((key, i) => {
+      if (original[i] === undefined) delete process.env[key];
+      else process.env[key] = original[i];
+    });
+  }
 });

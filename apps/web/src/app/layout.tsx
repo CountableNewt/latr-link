@@ -59,9 +59,6 @@ export const metadata: Metadata = {
   },
 };
 
-/** Runtime env for gateway credentials; hosted sensitive vars are not available at static build. */
-export const dynamic = "force-dynamic";
-
 export default function RootLayout({
   children,
 }: Readonly<{

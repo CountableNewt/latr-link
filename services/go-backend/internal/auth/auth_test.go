@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -104,6 +106,19 @@ func TestAuthenticateSignatureReplayAndBinding(t *testing.T) {
 	if _, e = a.Authenticate(r, false); e == nil {
 		t.Fatal("wrong URL accepted")
 	}
+	r.Host = "internal.binding.vercel"
+	external := "https://branch-preview.vercel.app/api/latr-gateway/xrpc/list"
+	r.Header.Set("DPoP", makeProof(external))
+	a.ProxyKey = "proxy-secret"
+	signProxyURL(r, a.ProxyKey, external)
+	if _, e = a.Authenticate(r, false); e != nil {
+		t.Fatalf("signed original proxy URL rejected: %v", e)
+	}
+	r.Header.Set("X-Latr-Proxy-Signature", strings.Repeat("0", 64))
+	if _, e = a.Authenticate(r, false); e == nil {
+		t.Fatal("forged original proxy URL accepted")
+	}
+
 }
 func TestProofPoolConsumesMatchingProofOnlyOnce(t *testing.T) {
 	raw := func(verb, path string) string {
@@ -130,3 +145,35 @@ func TestProofPoolConsumesMatchingProofOnlyOnce(t *testing.T) {
 type replayFunc func(context.Context, string, time.Time) error
 
 func (f replayFunc) Claim(c context.Context, k string, e time.Time) error { return f(c, k, e) }
+
+func signProxyURL(r *http.Request, key, raw string) {
+	r.Header.Set("X-Latr-Proxy-URL", raw)
+	mac := hmac.New(sha256.New, []byte(key))
+	_, _ = mac.Write([]byte(r.Method + "\n" + raw))
+	r.Header.Set("X-Latr-Proxy-Signature", hex.EncodeToString(mac.Sum(nil)))
+}
+func TestSignedProxyURLBindsRouteMethodAndSecret(t *testing.T) {
+	for _, tc := range []struct {
+		name, raw, signingKey, verificationKey, method string
+		valid                                          bool
+	}{
+		{"preview", "https://feature-abc.vercel.app/api/latr-gateway/xrpc/link.latr.bookmarks.saveBookmark?x=1", "secret", "secret", "POST", true},
+		{"localhost", "http://localhost:3000/api/latr-gateway/xrpc/link.latr.bookmarks.saveBookmark", "secret", "secret", "POST", true},
+		{"wrong secret", "https://feature-abc.vercel.app/api/latr-gateway/xrpc/link.latr.bookmarks.saveBookmark", "wrong", "secret", "POST", false},
+		{"missing configured secret", "https://feature-abc.vercel.app/api/latr-gateway/xrpc/link.latr.bookmarks.saveBookmark", "secret", "", "POST", false},
+		{"wrong path", "https://feature-abc.vercel.app/api/latr-gateway/xrpc/other", "secret", "secret", "POST", false},
+		{"wrong method", "https://feature-abc.vercel.app/api/latr-gateway/xrpc/link.latr.bookmarks.saveBookmark", "secret", "secret", "GET", false},
+		{"remote plaintext", "http://feature-abc.vercel.app/api/latr-gateway/xrpc/link.latr.bookmarks.saveBookmark", "secret", "secret", "POST", false},
+		{"credentials", "https://user:password@example.com/api/latr-gateway/xrpc/link.latr.bookmarks.saveBookmark", "secret", "secret", "POST", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := httptest.NewRequest(tc.method, "https://backend.internal/xrpc/link.latr.bookmarks.saveBookmark", nil)
+			signProxyURL(r, tc.signingKey, tc.raw)
+			r.Method = "POST"
+			got := signedProxyURL(r, tc.verificationKey)
+			if (got != "") != tc.valid {
+				t.Fatalf("got %q valid=%v", got, tc.valid)
+			}
+		})
+	}
+}

@@ -22,6 +22,7 @@ export function BrandLockup({
     <Link href={href} className={cn("flex min-w-0 items-center gap-2", className)}>
       <Image
         src={BRAND_ICON_PATH}
+        unoptimized
         alt=""
         width={iconSize}
         height={iconSize}

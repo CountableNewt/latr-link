@@ -4,13 +4,16 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/CountableNewt/latr-link/services/go-backend/internal/httpx"
 	secp "github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"math/big"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -31,6 +34,7 @@ type ClientResolver interface {
 type Authenticator struct {
 	HTTPClient *http.Client
 	PLCURL     string
+	ProxyKey   string
 	Replay     ReplayStore
 	Clients    ClientResolver
 	Now        func() time.Time
@@ -118,12 +122,42 @@ func normalizeHTU(raw string) string {
 	u.Host = strings.ToLower(u.Host)
 	return u.String()
 }
-func requestURLs(r *http.Request) []string {
+
+// signedProxyURL binds the original browser URL to this exact method and route.
+// Vercel service bindings rewrite host headers, so only the trusted frontend can
+// attest a public proxy URL that differs from the backend's connection URL.
+func signedProxyURL(r *http.Request, proxyKey string) string {
+	raw := r.Header.Get("X-Latr-Proxy-URL")
+	signature, err := hex.DecodeString(r.Header.Get("X-Latr-Proxy-Signature"))
+	if proxyKey == "" || raw == "" || err != nil || len(signature) != sha256.Size {
+		return ""
+	}
+	mac := hmac.New(sha256.New, []byte(proxyKey))
+	_, _ = mac.Write([]byte(r.Method + "\n" + raw))
+	if !hmac.Equal(signature, mac.Sum(nil)) {
+		return ""
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" || u.User != nil || u.Fragment != "" || u.Path != "/api/latr-gateway"+r.URL.Path {
+		return ""
+	}
+	if u.Scheme != "https" {
+		ip := net.ParseIP(u.Hostname())
+		if u.Scheme != "http" || (u.Hostname() != "localhost" && (ip == nil || !ip.IsLoopback())) {
+			return ""
+		}
+	}
+	return raw
+}
+func requestURLs(r *http.Request, proxyKey string) []string {
 	scheme := "https"
 	if r.TLS == nil && (strings.HasPrefix(r.Host, "localhost") || strings.HasPrefix(r.Host, "127.0.0.1")) {
 		scheme = "http"
 	}
 	out := []string{scheme + "://" + r.Host + r.URL.RequestURI()}
+	if original := signedProxyURL(r, proxyKey); original != "" {
+		out = append(out, original)
+	}
 	host := strings.TrimSpace(strings.Split(r.Header.Get("X-Forwarded-Host"), ",")[0])
 	proto := strings.TrimSpace(strings.Split(r.Header.Get("X-Forwarded-Proto"), ",")[0])
 	if host != "" {
@@ -204,7 +238,7 @@ func (a *Authenticator) Authenticate(r *http.Request, requireClient bool) (Conte
 		return result, unauthorized("invalid_dpop", "DPoP method mismatch")
 	}
 	matched := false
-	for _, candidate := range requestURLs(r) {
+	for _, candidate := range requestURLs(r, a.ProxyKey) {
 		if normalizeHTU(c.Htu) == normalizeHTU(candidate) {
 			matched = true
 		}

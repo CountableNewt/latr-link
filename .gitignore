@@ -57,3 +57,5 @@ coverage/
 *.dia
 .vercel
 .env*
+.playwright-cli/
+**/__pycache__/
