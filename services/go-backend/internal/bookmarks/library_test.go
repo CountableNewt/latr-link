@@ -70,6 +70,14 @@ func (f *fakeRepo) library() *Library {
 	})})
 }
 func rec(col, k string, v map[string]any) Record {
+	if col == Collection {
+		if _, ok := v["$type"]; !ok {
+			v["$type"] = Collection
+		}
+		if _, ok := v["createdAt"]; !ok {
+			v["createdAt"] = "2026-01-01T00:00:00Z"
+		}
+	}
 	return Record{URI: "at://did:plc:test/" + col + "/" + k, CID: "cid-" + k, Value: v}
 }
 func fixture(rs ...Record) *fakeRepo {
@@ -301,5 +309,40 @@ func TestUnverifiedViewerCannotReadWithoutPDSProof(t *testing.T) {
 	}
 	if _, e := l.owned(context.Background(), "at://did:plc:test/"+Collection+"/key"); e == nil {
 		t.Fatal("unverified token read record without upstream proof")
+	}
+}
+
+func TestListSkipsMalformedBookmarkWithoutMutatingRepository(t *testing.T) {
+	good := rec(Collection, "good", map[string]any{"subject": "https://example.com", "future": true})
+	bad := Record{URI: "at://did:plc:test/" + Collection + "/bad", CID: "bad-cid", Value: map[string]any{"$type": Collection}}
+	f := fixture(good, bad)
+	result, e := f.library().List(context.Background(), 50, "", "")
+	if e != nil {
+		t.Fatal(e)
+	}
+	views := result["bookmarks"].([]map[string]any)
+	if len(views) != 1 || views[0]["uri"] != good.URI {
+		t.Fatalf("unexpected views count %d", len(views))
+	}
+	if len(f.writes) != 0 || len(f.records) != 2 || f.records[bad.URI].Value["subject"] != nil {
+		t.Fatal("malformed source was changed")
+	}
+}
+func TestValidBookmarkRejectsWrongRequiredFieldTypes(t *testing.T) {
+	for _, field := range []string{"$type", "subject", "createdAt", "tags"} {
+		r := rec(Collection, "one", map[string]any{"subject": "https://example.com"})
+		r.Value[field] = 42
+		if validBookmark(r) {
+			t.Fatalf("accepted invalid %s", field)
+		}
+	}
+}
+func TestMalformedOnlyPagePreservesCursor(t *testing.T) {
+	l := New(auth.Context{DID: "did:plc:test", PDSEndpoint: "https://pds.example", SignatureVerified: true}, &http.Client{Transport: transport(func(r *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"records":[{"uri":"at://did:plc:test/community.lexicon.bookmarks.bookmark/bad","cid":"bad","value":{"$type":"community.lexicon.bookmarks.bookmark"}}],"cursor":"next-page"}`))}, nil
+	})})
+	p, e := l.list(context.Background(), Collection, 50, "")
+	if e != nil || len(p.Records) != 0 || p.Cursor != "next-page" {
+		t.Fatalf("records=%d cursor=%q err=%v", len(p.Records), p.Cursor, e)
 	}
 }

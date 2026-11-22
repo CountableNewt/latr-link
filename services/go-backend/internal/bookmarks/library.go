@@ -127,6 +127,29 @@ func subject(s string) (string, error) {
 	}
 	return s, nil
 }
+
+// validBookmark mirrors the fields required by the canonical Codable model.
+// PDS repositories may contain schema-invalid records written by other clients;
+// returning those raw maps would violate the gateway response contract.
+func validBookmark(r Record) bool {
+	if key(r.URI) == "" || r.CID == "" || str(r.Value, "$type") != Collection || str(r.Value, "subject") == "" || str(r.Value, "createdAt") == "" {
+		return false
+	}
+	if tags := r.Value["tags"]; tags != nil {
+		switch values := tags.(type) {
+		case []string:
+		case []any:
+			for _, value := range values {
+				if _, ok := value.(string); !ok {
+					return false
+				}
+			}
+		default:
+			return false
+		}
+	}
+	return true
+}
 func (l *Library) list(ctx context.Context, col string, limit int, cursor string) (page, error) {
 	q := url.Values{"repo": {l.repo}, "collection": {col}, "limit": {strconv.Itoa(limit)}}
 	if cursor != "" {
@@ -134,6 +157,15 @@ func (l *Library) list(ctx context.Context, col string, limit int, cursor string
 	}
 	var p page
 	e := l.client.Call(ctx, "com.atproto.repo.listRecords", "GET", q, nil, &p, !l.client.Auth.SignatureVerified)
+	if e == nil && col == Collection {
+		valid := make([]Record, 0, len(p.Records))
+		for _, record := range p.Records {
+			if validBookmark(record) {
+				valid = append(valid, record)
+			}
+		}
+		p.Records = valid
+	}
 	return p, e
 }
 func (l *Library) all(ctx context.Context, col string) ([]Record, error) {
@@ -161,6 +193,9 @@ func (l *Library) record(ctx context.Context, col, k string) (*Record, error) {
 	e := l.client.Call(ctx, "com.atproto.repo.getRecord", "GET", url.Values{"repo": {l.repo}, "collection": {col}, "rkey": {k}}, nil, &r, !l.client.Auth.SignatureVerified)
 	if errors.Is(e, pds.ErrNotFound) {
 		return nil, nil
+	}
+	if e == nil && col == Collection && !validBookmark(r) {
+		return nil, httpx.NewError(502, "invalid_stored_record", "Stored bookmark is malformed")
 	}
 	return &r, e
 }
