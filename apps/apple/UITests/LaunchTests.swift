@@ -87,20 +87,39 @@ final class LaunchTests: XCTestCase {
                 }
             }
         }
-        if !waitUntilSafariActionable(directShare, in: safari, timeout: 2) {
-            // Safari's compact toolbar exposes Share inside More. Page Menu is
-            // a separate formatting control and does not contain the share action.
-            guard tapVisibleCenter(menu, in: safari, timeout: 15, name: "Safari More toolbar control", dismissSafariGuidance: true) else { return }
-            // First-use guidance can consume the initial More tap rather than
-            // opening its menu. Dismiss it, then make the intended tap once more.
-            if dismissSafariTipIfPresent(safari) {
-                guard tapVisibleCenter(menu, in: safari, timeout: 15, name: "Safari More after guidance", dismissSafariGuidance: true) else { return }
+        var shareIsActionable = false
+        for attempt in 1...3 {
+            dismissSafariTipIfPresent(safari, timeout: 0)
+            // A visible but disabled Share action means the page is still loading.
+            // Wait for it; another More tap would only toggle its menu closed.
+            if directShare.exists {
+                shareIsActionable = waitUntilSafariActionable(directShare, in: safari, timeout: 30)
+                break
             }
+            guard waitUntilSafariActionable(menu, in: safari, timeout: 15) else {
+                capture(safari, name: "Safari More control unavailable")
+                XCTFail("Safari More control did not become actionable. \(safari.debugDescription)")
+                return
+            }
+            // Read again after waiting: late guidance can change menu visibility.
+            if directShare.exists {
+                shareIsActionable = waitUntilSafariActionable(directShare, in: safari, timeout: 30)
+                break
+            }
+            capture(safari, name: "Safari More setup attempt \(attempt)")
+            // Use the actual control's accessibility action. A window-coordinate
+            // tap can silently miss even when the frame is correct.
+            menu.tap()
+            if directShare.waitForExistence(timeout: 5) {
+                shareIsActionable = waitUntilSafariActionable(directShare, in: safari, timeout: 30)
+                break
+            }
+            // Retry only setup when no Share action appeared. The next attempt
+            // dismisses late guidance and requires More to be hittable again.
         }
-        // Safari exposes the button while a page is loading but keeps it
-        // disabled. A tap at that point is ignored and no share sheet opens.
-        guard waitUntilSafariActionable(directShare, in: safari, timeout: 30) else {
-            XCTFail("Safari Share control did not become actionable. \(safari.debugDescription)")
+        guard shareIsActionable else {
+            capture(safari, name: "Safari Share control unavailable")
+            XCTFail("Safari Share control did not become actionable after bounded setup. \(safari.debugDescription)")
             return
         }
         directShare.tap()
@@ -154,16 +173,13 @@ final class LaunchTests: XCTestCase {
         return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
     }
 
-    @MainActor private func tapVisibleCenter(_ element: XCUIElement, in app: XCUIApplication, timeout: TimeInterval, name: String, dismissSafariGuidance: Bool = false, file: StaticString = #filePath, line: UInt = #line) -> Bool {
-        let actionable = dismissSafariGuidance
-            ? waitUntilSafariActionable(element, in: app, timeout: timeout)
-            : waitUntilHittable(element, timeout: timeout)
-        guard actionable else {
+    @MainActor private func tapVisibleCenter(_ element: XCUIElement, in app: XCUIApplication, timeout: TimeInterval, name: String, file: StaticString = #filePath, line: UInt = #line) -> Bool {
+        guard waitUntilHittable(element, timeout: timeout) else {
             XCTFail("\(name) is not hittable. \(app.debugDescription)", file: file, line: line)
             return false
         }
-        // Safari controls and remote share cells can report a valid frame while
-        // their accessibility tap resolves outside it. Tap through the window.
+        // Remote share cells can report a valid frame while their accessibility
+        // tap resolves outside it. This fallback is not used for Safari More.
         let window = app.windows.firstMatch
         let windowFrame = window.frame
         let visibleFrame = element.frame.intersection(windowFrame)

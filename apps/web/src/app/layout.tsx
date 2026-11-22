@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { CSSProperties } from "react";
 import Script from "next/script";
 
+import { WebAnalytics } from "@/components/WebAnalytics";
 import { EnvironmentBanner } from "@/components/shared/EnvironmentBanner";
 import {
   environmentBannerOffset,
@@ -90,6 +91,7 @@ export default function RootLayout({
           <EnvironmentBanner appEnv={appEnv} />
           {children}
         </Providers>
+        <WebAnalytics appEnv={appEnv} deploymentEnv={process.env.VERCEL_ENV} />
       </body>
     </html>
   );

@@ -28,7 +28,7 @@ export default function PrivacyPage() {
       <article className="mx-auto max-w-4xl space-y-10 px-4 py-12 sm:px-6 sm:py-16">
         <div className="space-y-3 border-b border-border pb-8">
           <h1 className="text-4xl font-semibold tracking-tight">Privacy Policy</h1>
-          <p className={bodyClass}>Effective August 23, 2026</p>
+          <p className={bodyClass}>Effective November 22, 2026</p>
           <p className={bodyClass}>
             This policy covers L@tr.link on the web and the official Chrome and
             Firefox extensions.
@@ -86,6 +86,23 @@ export default function PrivacyPage() {
             Infrastructure providers may retain limited operational logs, such
             as request route, status, timing, IP address, and error details, for
             security and reliability.
+          </p>
+        </section>
+
+        <section className={sectionClass}>
+          <h2 className={headingClass}>Website analytics</h2>
+          <p className={bodyClass}>
+            The production website uses Vercel Web Analytics to understand page
+            visits, referring pages, approximate location, and browser and device
+            types. We send only known page paths, remove query strings and
+            fragments, and exclude OAuth callback pages. Visits with sensitive
+            or invalid referrer URLs are not collected. Saved item contents,
+            tags, account identifiers, and OAuth credentials are not sent as
+            analytics properties. Analytics is disabled in development and previews.
+          </p>
+          <p className={bodyClass}>
+            See <a className="text-primary hover:underline" href="https://vercel.com/docs/analytics/privacy-policy">Vercel&apos;s analytics privacy documentation</a>{" "}
+            for details about how the provider processes traffic measurements.
           </p>
         </section>
 
