@@ -25,6 +25,12 @@ Status: production and branch previews run on Vercel; all eight Railway service 
 
 ## Availability and constraints
 
+`LATR_GATEWAY_ADDITIONAL_CLIENT_CREDENTIALS` accepts the same internal
+`client-id=credential` map as the required primary map. Use it to add clients or
+overlapping rotation keys without retrieving or replacing an existing Secret
+map. Existing credentials remain accepted; malformed maps fail startup without
+logging their values. Scope additions to the intended environment.
+
 Vercel Services and native Go runtime are currently beta on all plans. Native Go callers cannot consume service bindings; frontend Node functions can. The deployment topology must therefore route independently authenticated API prefixes directly to each Go service instead of requiring Go-to-Go bindings. Preview metadata must be accessible to OAuth authorization servers without Vercel authentication.
 
 Turso Free currently includes 100 databases, 5 GB storage, 500 million monthly rows read, 10 million monthly rows written, and one day of point-in-time restore. Preview databases count toward these limits. Do not enable paid upgrades or add-ons.
