@@ -3,8 +3,9 @@
  * {@link ../components/shared/EnvironmentBanner.tsx}.
  *
  * `NEXT_PUBLIC_APP_ENV` / `APP_ENV`: **`prod`** | **`local`** | **`dev`** | **`test`**
- * (see `apps/web/.env.example`). Railway sets this explicitly. When unset,
- * `next dev` resolves to **`local`** and other builds resolve to **`dev`**.
+ * (see `apps/web/.env.example`). next.config.ts supplies **`prod`** for Vercel
+ * production and **`dev`** for previews unless explicitly overridden. Without
+ * build-injected config, `next dev` falls back to **`local`**, other builds to **`dev`**.
  */
 import type { LatrAppEnv } from "latr-web-client/latrGatewayConfig";
 

@@ -27,6 +27,7 @@ The command writes the submission artifacts, release manifest, and checksums und
 bun run --cwd apps/extension prepare:store
 bun run --cwd apps/extension typecheck
 bun run --cwd apps/extension test
+cd apps/extension
 bunx wxt zip -b chrome -m store
 bunx wxt zip -b firefox -m store
 ```

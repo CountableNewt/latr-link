@@ -3,8 +3,8 @@ import Foundation
 
 // Icon Composer's appearance overrides replace SVG fills. Outline the stroke so
 // dark mode colors the actual mark rather than closing and filling its center.
-let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-let source = try String(contentsOf: root.appendingPathComponent("mark.svg"), encoding: .utf8)
+let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+let source = try String(contentsOf: root.appendingPathComponent("../../packages/native-brand/mark.svg"), encoding: .utf8)
 let pathText = source.components(separatedBy: "d=\"")[1].components(separatedBy: "\"")[0]
 let expression = try NSRegularExpression(pattern: "[MC]|-?[0-9]+(?:\\.[0-9]+)?")
 let tokens = expression.matches(in: pathText, range: NSRange(pathText.startIndex..., in: pathText))
@@ -50,6 +50,6 @@ let svg = """
 
 """
 let destination = root.appendingPathComponent(
-    "../../apps/apple/Resources/AppIcon.icon/Assets/l-mark-outlined.svg"
+    "Resources/AppIcon.icon/Assets/l-mark-outlined.svg"
 )
 try svg.write(to: destination, atomically: true, encoding: .utf8)

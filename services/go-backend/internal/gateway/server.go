@@ -38,13 +38,13 @@ type Server struct {
 
 func FromEnvironment(kind string) (*Server, error) {
 	client := httpx.PublicClient(25 * time.Second)
-	store, err := storage.New(os.Getenv("TURSO_DATABASE_URL"), os.Getenv("TURSO_AUTH_TOKEN"), nil)
+	clients, err := clientsFromEnvironment()
 	if err != nil {
 		return nil, err
 	}
-	clients := ParseClients(os.Getenv("LATR_GATEWAY_OFFICIAL_CLIENT_CREDENTIALS"))
-	if len(clients) == 0 {
-		return nil, errors.New("LATR_GATEWAY_OFFICIAL_CLIENT_CREDENTIALS must contain internal client credentials")
+	store, err := storage.New(os.Getenv("TURSO_DATABASE_URL"), os.Getenv("TURSO_AUTH_TOKEN"), nil)
+	if err != nil {
+		return nil, err
 	}
 	return &Server{Auth: &auth.Authenticator{HTTPClient: client, Replay: store, Clients: clients, ProxyKey: os.Getenv("LATR_GATEWAY_PROXY_SECRET")}, State: store, HTTP: client, Metadata: metadata.New(client), Kind: kind, CronSecret: os.Getenv("CRON_SECRET")}, nil
 }

@@ -109,7 +109,7 @@ function syncLatrGatewayFromProcessEnv(): void {
 }
 
 /**
- * Base URL for `services/latr-gateway` API calls.
+ * Base URL for `services/go-backend` gateway API calls.
  * Hostname mapping wins over loopback overrides; non-loopback explicit URL wins otherwise.
  */
 export function latrGatewayBaseUrl(): string {

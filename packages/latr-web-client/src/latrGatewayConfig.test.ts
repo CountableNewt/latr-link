@@ -14,6 +14,8 @@ import {
   latrGatewayBaseUrl,
   latrGatewayClientHeaders,
   resolveLatrGatewayConfig,
+  publishLatrGatewayWindowBootstrap,
+  type LatrGatewayWindowBootstrap,
 } from "./latrGatewayConfig";
 
 function resetGatewayConfig() {
@@ -94,7 +96,7 @@ describe("Latr Gateway Base URL", () => {
     );
   });
 
-  test("Sends Split Developer Headers When Client ID and API Key Are Configured", () => {
+  test("Sends Split Internal Headers When Environment Credentials Are Configured", () => {
     configureLatrGateway({
       clientId: "the-social-wire-web",
       apiKey: "lk_test_key",
@@ -145,25 +147,53 @@ describe("Latr Gateway Base URL", () => {
     }
   });
 
-  test("resolveLatrGatewayConfig Merges Window Bootstrap Credentials", () => {
+  test("Ignores legacy credentials injected into the public window bootstrap", () => {
     configureLatrGateway({
       appEnv: "dev",
       testingHostname: "testing.latr.link",
-      clientId: "",
-      apiKey: "",
     });
     const previousWindow = globalThis.window;
+    const legacyBootstrap = {
+      gatewayUrl: DEFAULT_TESTING_LATR_GATEWAY_URL,
+      clientId: "latr-link-web",
+      apiKey: "legacy-key",
+      clientCredential: "legacy-secret",
+    };
     globalThis.window = {
-      __LATR_GATEWAY_BOOTSTRAP__: {
-        clientId: "latr-link-web",
-        apiKey: "lk_test_key",
-      },
-    } as Window & typeof globalThis;
+      __LATR_GATEWAY_BOOTSTRAP__: legacyBootstrap,
+    } as unknown as Window & typeof globalThis;
     try {
-      expect(() => assertLatrGatewayClientCredential()).not.toThrow();
-      const headers = latrGatewayClientHeaders(resolveLatrGatewayConfig());
-      expect(headers[LATR_CLIENT_ID_HEADER]).toBe("latr-link-web");
-      expect(headers[LATR_API_KEY_HEADER]).toBe("lk_test_key");
+      expect(latrGatewayClientHeaders(resolveLatrGatewayConfig())).toEqual({});
+      expect(() => assertLatrGatewayClientCredential()).toThrow(/client credentials/i);
+    } finally {
+      globalThis.window = previousWindow;
+    }
+  });
+
+  test("Publishing public config discards old and newly supplied credential fields", () => {
+    const previousWindow = globalThis.window;
+    const legacyBootstrap = {
+      gatewayUrl: DEFAULT_TESTING_LATR_GATEWAY_URL,
+      appEnv: "dev" as const,
+      clientId: "old-client",
+      apiKey: "old-key",
+      clientCredential: "old-secret",
+    };
+    globalThis.window = {
+      __LATR_GATEWAY_BOOTSTRAP__: legacyBootstrap,
+    } as unknown as Window & typeof globalThis;
+    try {
+      const incoming = {
+        appEnv: "prod" as const,
+        clientId: "new-client",
+        apiKey: "new-key",
+        clientCredential: "new-secret",
+      };
+      publishLatrGatewayWindowBootstrap(incoming);
+      expect(window.__LATR_GATEWAY_BOOTSTRAP__).toEqual({
+        gatewayUrl: DEFAULT_TESTING_LATR_GATEWAY_URL,
+        appEnv: "prod",
+      } satisfies LatrGatewayWindowBootstrap);
     } finally {
       globalThis.window = previousWindow;
     }

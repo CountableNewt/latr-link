@@ -2,56 +2,29 @@
 
 ## Components
 
-- **Web (`apps/web`)** — Next.js App Router, ATProto OAuth in the browser, thin client to the L@tr gateway for save/list/state workflows.
-- **LatrKit Developer Console (`apps/latrkit-dev`)** — Next.js portal for developer clients, API keys, and usage.
-- **Gateway (`services/latr-gateway`)** — Swift/Hummingbird HTTP service: OAuth/DPoP gate, PDS write-through, server-side Open Graph fetch, Standard.site AT URI discovery.
-- **`Stygian-Tech/latr-kit`** (GitHub) — Swift **`LatrKit`** library (`SavedLibrary`, `RepositoryClient`, `URLNormalizer`, …). SwiftPM git dependency from `services/latr-gateway`.
-- **`Stygian-Tech/latr-packages`** (GitHub) — TS contracts (`gateway-client`, `record-keys`, lexicons). Root git dependency; not duplicated under `packages/`.
-- **`packages/latr-web-client`** — Monorepo-only shared save/gateway client for web + extension (no separate org repo).
+- **Web (`apps/web`)** — Next.js frontend with browser ATProto OAuth and a same-origin credential proxy.
+- **Go backend (`services/go-backend`)** — Bookmark gateway and metadata service with OAuth/DPoP verification, PDS operations, previews and URL discovery.
+- **Apple app (`apps/apple`)** — iPhone/iPad app, share extension, tests and icon tooling, with a macOS-compatible core Swift package. The checked-in project defines iOS targets; it does not define a macOS application target. The remote Swift LatrKit dependency is used by native clients.
+- **Browser extension (`apps/extension`)** — Saves through the hosted credential proxy.
+- **`latr-packages`** — Canonical TypeScript gateway contracts, record keys and lexicons, pinned as a remote dependency.
+- **`packages/latr-web-client`** — Shared web/extension gateway and save helpers.
 
-```mermaid
-flowchart LR
-  Browser[L@tr_web]
-  Console[LatrKit_console]
-  Gateway[L@tr_gateway]
-  PDS[User_PDS]
-  AppView[Bluesky_AppView]
-  Browser -->|"OAuth_DPoP"| Gateway
-  Console -->|"OAuth_DPoP"| Gateway
-  Gateway -->|"com.atproto.repo.*"| PDS
-  Browser -->|"public_reads"| AppView
-  Browser -->|"read_only_getRecord"| PDS
-```
+The hosted Swift server and public developer console are retired. Their source
+is retained in Git history at `009e734`.
 
-## Data ownership
+## Data ownership and authentication
 
-| Data | Location |
-|------|----------|
-| Saved items | `link.latr.saved.item` on the user’s repo |
-| External URL wrappers | `link.latr.saved.external` on the user’s repo |
-| Session tokens | OAuth client browser storage (IndexedDB / memory) |
-| Optional UI cache | Browser `localStorage` / memory (React Query persistence) |
+Bookmarks live in `community.lexicon.bookmarks.bookmark` on the user's PDS;
+reading state lives in `link.latr.bookmarks.metadata`. Turso stores derived
+preview cache and atomic DPoP replay claims. OAuth tokens stay in client session
+storage. Client secrets are internal server environment configuration.
 
-Save, list, archive, and unsave run through the L@tr gateway. The web app no longer performs direct L@tr `com.atproto.repo.*` writes.
+Clients call the deployment-local `/api/latr-gateway/*` proxy, which forwards
+viewer OAuth/DPoP and injects internal credentials. Go reads and mutates the
+user's PDS, preserving unknown fields and using optimistic concurrency.
+Canonical record keys and upstream proof pools come from `latr-packages`.
 
-## Flows (summary)
-
-1. **Save external URL** — Web POSTs to gateway → normalize URL → upsert `link.latr.saved.external` → upsert `link.latr.saved.item` → server OG enrichment.
-2. **Save ATProto record** — Web POSTs subject URI (+ optional linked web URL) → gateway upserts `link.latr.saved.item` with preview metadata when OG is available.
-3. **List** — Gateway lists `link.latr.saved.item`; web resolves each `subjectUri` for display (App View + read-only repo get).
-4. **Unsave / archive** — Gateway PATCH/DELETE on saved-item records.
-
-## OAuth scopes
-
-Repository writes use a human-readable permission set plus action-limited `repo:` scopes aligned across the shared web client, hosted metadata, and Swift gateway metadata:
-
-- `community.lexicon.bookmarks.bookmark`: create, update, and delete community bookmark records.
-- `include:link.latr.authFull`: create, update, and delete L@tr reading-state metadata.
-- Transitional `link.latr.saved.*`: delete only, after migration into community bookmarks.
-- Legacy `com.latr.saved.*`: delete only, after the one-time copy into current collections.
-
-Public repository reads require no additional permission. L@tr.link does not request profile, post, message, email, or account-management access. The web client additionally requests User Input publication and blob access solely for feedback and attached photos; the extension does not. Users must re-auth after scope changes.
-
-See [latr-gateway.md](./latr-gateway.md) for route contracts, deployment, and auth constraints.
-Railway topology, migrations, and cutover safeguards are documented in
-[../deployment/railway.md](../deployment/railway.md).
+OAuth scopes must match the published client metadata. Users must re-authenticate
+after scope changes. See [gateway contracts](latr-gateway.md),
+[Apple app](../../apps/apple/README.md) and
+[Vercel deployment](../deployment/vercel-migration.md).
