@@ -173,6 +173,11 @@ old value after callers are updated. Existing SHA-256 credential hashes remain
 supported. Invalid entries, duplicate client IDs, empty rotation values and
 malformed hashes fail startup without logging secrets.
 
+When the original Secret map cannot be retrieved, add new clients or rotation
+keys with `LATR_GATEWAY_ADDITIONAL_CLIENT_CREDENTIALS` using the same format.
+The primary map remains required and unchanged; credentials for matching client
+IDs are appended. Scope additions to the intended environment before deploying.
+
 Removed the unused developer-management SDK and retired developer-database
 migration tooling. The legacy SQLite schema fixture remains solely to verify
 that current Turso migration excludes retired clients, keys and usage. Public
